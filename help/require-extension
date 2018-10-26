@@ -1,0 +1,24 @@
+S9fES  (require-extension <extension> ...)  ==>  unspecific
+
+When the given <extension>s have been compiled into the interpreter
+running this form, the form evaluates to an unspecific value. When
+at least one of the given <extension>s is absent, an error is
+signalled.
+
+Each extension may be either a symbol or a list of the form
+
+(or <name> ...)
+
+where each <name> names an extension. For the REQUIRE-EXTENSIONS form
+to succeed, it is sufficient if one of the extensions named in (or ...)
+is present. For example:
+
+(require-extension curses)
+
+requires the CURSES extension to be compiled-in, and
+
+(require-extension (or sys-unix sys-plan9))
+
+requires either the SYS-UNIX or the SYS-PLAN9 extension to be present.
+(In the unlikely case that both the SYS-UNIX and SYS-PLAN9 extensions
+would be detected, the form would still succeed).

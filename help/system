@@ -1,0 +1,8 @@
+S9fES  (system string)  ==>  integer
+
+Run the command STRING and return its exit status.
+
+This procedure is deprecated; use SYSTEM-COMMAND instead.
+
+(system "ls")              ==>  0
+(system "ls nonexistent")  ==>  127

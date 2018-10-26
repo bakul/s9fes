@@ -1,0 +1,3 @@
+S9fES  (current-error-port)  ==>  output-port
+
+Returns a port connected to the Unix error file descriptor (2).

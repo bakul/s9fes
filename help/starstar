@@ -1,0 +1,71 @@
+S9fES **              ==>  object
+      *arguments*     ==>  list
+      *epsilon*       ==>  real
+      *extensions*    ==>  list
+      *image-file*    ==>  string | #f
+      *host-system*   ==>  symbol
+      *library-path*  ==>  list
+      *loading*       ==>  boolean
+      *release-date*  ==>  string
+
+These are dynamic variables defined at the top level of S9fES.
+
+** is bound to the result most recently displayed at the REPL.
+Erroneous and aborted computations as well as unspecific results
+do not change the value of this variable.
+
+*ARGUMENTS* is bound to a list of strings containing any command
+line arguments passed to the program being interpreted. This list
+does *not* include any options passed to the S9 interpeter.
+
+*EPSILON* bound to the smallest difference between two real
+numbers in the given S9 implementation.
+
+*EXTENSIONS* is bound to a list of language extensions provided
+by the interpreter. The list may be empty.
+
+*IMAGE-FILE* is bound to the full path of the image file that was
+loaded when the interpreter started, or #f when no image file was
+loaded at all.
+
+*HOST-SYSTEM* is bound to a symbol describing the host system on
+which S9fES is running. It is currently either UNIX, PLAN9, or
+UNKNOWN.
+
+*LIBRARY-PATH* is bound to a list containing the directories
+specified in the S9FES_LIBRARY_PATH environment variable. The
+environment variable contains the directories as a string of
+colon-separated components while *LIBRARY-PATH* contains
+individual strings.
+
+*LOADING* is set to #T when the interpreter loads a file and
+otherwise to #F. Altering the value of *LOADING* by a program
+will lead to undefined behavior of S9fES.
+
+*RELEASE-DATE* is bound to a string containing the release date
+of the S9 interpreter in the format "YYYY-MM-DD".
+
+(cons 1 2)       ==>  (1 . 2)
+(car **)         ==>  1
+
+*epsilon*        ==>  1e-18
+
+*extensions*     ==>  ()
+
+*host-sytstem*   ==>  unix
+
+*library-path*   ==>  ("." "~/.s9fes" "/u/share/s9fes")
+
+*loading*        ==>  #f
+
+*release-date*   ==>  "2018-10-23"
+
+If you want to change the values of these variables temporarily at
+run time, you need the FLUID-LET syntax, which is contained in the
+S9fES extension library:
+
+(let ((*library-path* "some-new-path"))
+  (load-from-library "in-new-path.scm"))       ==>  error
+
+(fluid-let ((*library-path* "some-new-path"))
+  (load-from-library "in-new-path.scm"))       ==>  OK

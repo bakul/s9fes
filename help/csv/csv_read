@@ -1,0 +1,53 @@
+S9 EXT  (csv:read)        ==>  list | eof-object
+        (csv:write list)  ==>  unspecific
+
+CSV:READ reads a record in "comma-separated values" (CSV) format and
+returns its fields as a list of strings. When reading the end of the
+input file before the first field of the record is found, CSV:READ
+returns the end of file object (see EOF-OBJECT?).
+
+CSV:WRITE writes a record in CSV format. The fields of the record are
+passed to CSV:WRITE as a list of strings.
+
+RATIONALE
+
+Decoding and encoding of CSV records is painful in an interpreted
+Scheme environment due to performance issues.
+
+DATABASE FORMAT
+
+A database in CSV format consists of a sequence of CSV records, where
+each record is is a line of text delimited with a line separator. The
+form of the separator depends on the environment.
+
+A CSV record is a sequence of double quote delimited fields that are
+separated by commas, e.g.:
+
+"field 1","field 2","field 3"
+
+There may be any number of blank (ASCII 32) characters between fields
+and multiple commas between fields denote empty fields. E.g., each of
+the following records has three fields:
+
+"field 1" , ,  "field3"
+"field 1", , "field3"
+"field 1",,"field3"
+
+However, commas in front of the first field or after the last field will
+be ignored.
+
+A double quote character can be included in a field by duplicating it,
+e.g.:
+
+""""
+"the ""car"" function"
+
+EXAMPLES:
+
+(csv:read)"1","2,"3"       ==>  ("1" "2" "3")
+(csv:read)"foo","""bar"""  ==>  ("foo" "\"bar\"")
+(csv:read)"",,,""          ==>  ("" "" "" "")
+
+(csv:write '("1" "2" "3"))     writes  "1","2","3"
+(csv:write '("foo" "\"bar\"")  writes  "foo","""bar"""
+(csv:write '("" "" "" "")      writes  "","","",""

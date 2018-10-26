@@ -1,0 +1,20 @@
+S9FES  (if* <test> <alternate>)  ==>  object
+
+Syntax: <test> and <alternate> may be arbitrary expressions.
+
+Semantics: An IF* expression is evaluated as follows: first,
+<test> is evaluated. If it yields a true value, then this
+value is returned. Otherwise <alternate> is evaluated and its
+value is returned.
+
+Formally,
+
+(if* <test> <alternate>)
+
+if equal to
+
+(let ((t <test>)) (if t t <alternate>)).
+
+(if* (> 3 2) 'no)  ==>  #t
+(if* (> 2 3) 'no)  ==>  no
+(if* 'foo (/ 0))   ==>  foo

@@ -1,0 +1,129 @@
+
+2018-10-26
+	Installed patches for the Plan 9 build submitted by Bakul Shah
+	and McKay Marston. Thank you very much!
+	Fix: Reference trace was in wrong order in error messages. (s9.c)
+	Fix: GC leak in the compiler. (s9.c)
+	Added CATCH-ERRORS form. (s9.c, s9.scm)
+2018-10-25
+	Added CATCH and THROW procedures. (s9.c)
+	Error messages are now printed to stdout unless the interpreter
+	is run in quiet mode (which is implied when running programs in
+	batch mode). (s9.c)
+	Fix: SIGINT was caught in quiet mode. (s9.c)
+	Longjmp'ing out of a signal handler may cause portability issues,
+	even if POSIX allows it. Worked around it. (s9.c)
+	Thanks, Bakul Shah, for pointing this out!
+	util/fix-help-links is now called util/fix-links.sh (for Unix)
+	and util/fix-links.rc (for Plan 9). (util/)
+2018-10-24
+	Forgot:
+	Policy change: image files are now loaded from the directory
+	specified in the S9FES_IMAGE_DIR environment variable or from
+	*one* directory specified in IMAGE_DIR (s9.c). When no image
+	can be found there, "./s9.image" will be tried. When this fails,
+	too, the interpreter will not start.
+	To load the library source code, "s9 -i -" *must* be used; this
+	is no longer a fallback.
+	Added S9FES-REIMAGINED and SCHEME-9-FROM-EMPTY-SPACE-REIMAGINED
+	feature ID's to COND-EXPAND, so you can distinguish between the
+	old and new S9 version. (lib/)
+	Added the *RELEASE-DATE* top-level variable that is bound to a
+	copy of the compiled-in RELEASE_DATE of the interpreter. (lib/)
+	Thanks for the idea, Peter!
+
+-------------------------------------------------------------------------------
+	SCHEME 9 FROM EMPTY SPACE (REIMAGINED)
+-------------------------------------------------------------------------------
+
+2018-10-22
+
+	This is a complete rewrite of most of the S9fES interpreter
+	with the following highlights:
+
+	- the S9 system now uses a bytecode compiler and abstract
+	  machine (earlier versions used a tree walker)
+
+	- the S9 interpreter now uses shallow binding instead of
+	  deep binding. This means that
+
+		- symbol lookup is now O(1) (was O(n log n))
+		- closure creation is now O(n) (small n, was O(1))
+
+	- the compiler inlines most standard Scheme procedures and
+	  lambda-lifts functions when called immediately. That is,
+	  ((lambda (x) y) z) will not create a closure (unless Y
+	  uses SET!).
+
+	- the table of interned symbols is a hash table now instead
+	  of a list.
+
+	- Lots of bugs were fixed in SYNTAX-RULES, but it is still
+	  not fully hygienic and a second-class member of S9. Use
+	  low-level macros instead!
+
+	New syntax:
+
+	- The IF* syntax is similar to IF:
+
+	  (IF* <true-value> <alternative>)  ==>  <true-value>
+	  (IF* #f <alternative>)            ==>  <alternative>
+
+	  (IF* X Y) can be thought of as a very efficient version of
+
+	  (let ((t x)) (if t t y))
+
+	  It is used internally to implement (COND (X)) and OR.
+
+	New procedures:
+
+	- DUMP-IMAGE creates an image file
+
+	- QUIT exits the interpreter
+
+	- CURRENT-ERROR-PORT returns a port that is connected to stderr
+
+	- OPEN-APPEND-FILE is like OPEN-OUTPUT-FILE, but appends output
+	  to the given file
+
+	- COMMAND-LINE returns the command line arguments passed to a
+	  program (was: ARGV, still available).
+
+	- ENVIRONMENT-VARIABLE looks up an environment variable
+	  (was: ENVIRON, still available)
+
+	- SYSTEM-COMMAND runs a shell commend (was: SYSTEM, still
+	  available)
+
+	Minor changes:
+
+	- the "-f file" command line option is deprecated; use "file"
+
+	- strings can now contain \n (newline) escape sequences
+
+	- CALL/CC is working properly and passes all Petrofsky tests.
+	  It is rather expensive, though!
+
+	- *LIBRARY-PATH* is now in list format (was a Unix PATH-style
+	   string).
+
+	- *IMAGE-FILE* names the image file in use (or is set to #f).
+
+	- the initial image file is loaded from the directory specified
+	  in the S9_IMAGE_DIR environment variable
+
+	- EVAL is now a single-argument function.
+
+	- GENSYM is now a function of no arguments.
+
+	- the STATS function no longer counts reduction steps, but does
+	  count allocated vector cells.
+
+	- the BIT-OP function signals an error in case of an overflow or
+	  wrong opcode instead of returning #F.
+
+-------------------------------------------------------------------------------
+
+The change log of S9fes (Reimagined) ends here.
+For previous changes, see the file PREHISTORY.
+

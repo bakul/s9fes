@@ -1,0 +1,8 @@
+S9fES  (dump-image "string")  ==>  unspecific
+
+Write a heap image to the file specified in STRING. The heap
+image can be loaded when starting the S9 interpreter by using
+the  "-i" command line option. Heap images load much faster
+than Scheme source code.
+
+(dump-image "my-setup.image")  ==>  unspecific

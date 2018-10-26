@@ -1,0 +1,9 @@
+S9 EXT  (sys:system string)  ==>  integer
+
+Run the command STRING and return its exit status.
+
+You may prefer to use the SYSTEM-COMMAND procedure
+instead, which is built into the core S9 interpreter.
+
+(sys:system "ls")              ==>  0
+(sys:system "ls nonexistent")  ==>  127

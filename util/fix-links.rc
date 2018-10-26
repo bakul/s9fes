@@ -1,0 +1,3 @@
+# Run this script in the S9 root to rebuild the help symlinks
+
+cp='cp' rc util/make-help-links

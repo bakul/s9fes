@@ -1,0 +1,7 @@
+S9fES  (quit)  ==>  undefined
+
+Exit from S9 and return control to the invoking process.
+
+QUIT never returns any value.
+
+(quit)  ==>  undefined

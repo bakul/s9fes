@@ -1,0 +1,44 @@
+S9fES  (catch-errors <value> <body>)  ==>  object
+       *error-tag*                    ==>  catch-tag
+       *error-value*                  ==>  object
+
+CATCH-ERRORS intercepts error conditions as signalled by the
+interpreter. First it evaluates <value>, which may be an expression
+evaluating to any kind of object and sets up a catch tag (see CATCH)
+that will be thrown when an error occurs during the evaluation of
+the given <body> (which may also be any kind of expression). The
+dynamic extent of the catch tag is called the "error context" of
+the CATCH-ERRORS form.
+
+When no error is signalled during the evaluation of the <body>,
+CATCH-ERRORS will return its value. When an error is signalled,
+it will return <value> instead. Any expressions of <body> that
+would have been evaluated after the error occurred will never be
+evaluated in this case.
+
+When CATCH-ERRORS has returned its value, the caller's error
+context will be re-established.
+
+When an error is signalled during the evaluation of <value>, the
+error is not intercepted and will terminate program evaluation.
+
+The top-level variable *ERROR-TAG* is bound to the catch tag that
+will currently be thrown when an error is intercepted. *ERROR-VALUE*
+is bound to the value that will be returned by CATCH-ERRORS in case
+of an error. These variables should never be modified by procedures
+other than CATCH-ERRORS.
+
+Rationale:
+
+CATCH-ERRORS is a general mechanism for intercepting errors when
+an error is likely to occur, like reading user input with READ or
+dividing integers in computations where a divisor of zero may
+appear. Typically, the <body> of CATCH-ERRORS should be small,
+because otherwise unexpected errors may be caught and lead to
+unexpected program behavior.
+
+(catch-errors 'failed (cons 1 2))  ==>  (1 . 2)
+
+(catch-errors 0 (quotient 1 0))  ==>  0
+
+(catch-errors 'oops (read)) #\undefined  ==> oops

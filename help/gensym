@@ -1,0 +1,10 @@
+S9fES  (gensym)  ==>  symbol
+
+Return a fresh symbol that is guaranteed to be unique.
+
+(gensym)  ==>  G56
+
+(let* ((a (gensym))
+       (b (gensym))
+       (c (gensym)))
+  (list a b c))      ==>  (G61 G62 G63)

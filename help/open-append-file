@@ -1,0 +1,6 @@
+S9fES  (open-append-file filename)  ==>  output-port
+
+Opens an output file, like OPEN-OUTPUT-FILE, but never truncates
+an existing file. Any data written to the resulting output port
+will be appended to the specified file. When the file cannot be
+opened, an error will be signalled.

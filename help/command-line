@@ -1,0 +1,9 @@
+S9fES  (command-line)  ==>  list
+
+Return the command line arguments passed to the S9 interpeter
+after the "--" argument. Each argument will be packaged in a
+separate string.
+
+(command-line)  ==>  ()             ; s9
+(command-line)  ==>  ("a" "b" "c")  ; s9 -- a b c
+                                    ; or s9 program a b c
