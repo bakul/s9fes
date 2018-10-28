@@ -83,4 +83,4 @@ trap '
 ' 1 2 3 15
 
 export S9FES_LIBRARY_PATH
-./s9 -i test.image -f $testfile
+./s9 -i ./test.image $testfile

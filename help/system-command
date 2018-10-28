@@ -1,6 +1,12 @@
 S9fES  (system-command string)  ==>  integer
 
-Run the command STRING and return its exit status.
+Pass the given STRING to the operating system for execution and
+return the exit code returned by the system. On Unix this typically
+means passing the command to /bin/sh and on Plan 9 commands will
+be passed to /bin/rc.
+
+An exit code of zero indicates success and a non-zero exit code
+signals failure.
 
 (system-command "ls")              ==>  0
 (system-command "ls nonexistent")  ==>  127

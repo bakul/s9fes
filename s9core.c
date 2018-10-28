@@ -1,5 +1,5 @@
 /*
- * S9core Toolkit, Mk IV
+ * S9core Toolkit, Mk IVa
  * By Nils M Holm, 2007-2018
  * In the public domain
  *
@@ -1078,8 +1078,7 @@ cell s9_argv_to_list(char **argv) {
 	int	i;
 	cell	a, n;
 
-	if (argv[0] == NULL)
-		return NIL;
+	if (argv[0] == NULL) return NIL;
 	a = cons(NIL, NIL);
 	save(a);
 	for (i = 0; argv[i] != NULL; i++) {
@@ -1093,6 +1092,37 @@ cell s9_argv_to_list(char **argv) {
 	}
 	return s9_unsave(1);
 }
+
+#ifdef plan9
+
+int system(char *cmd) {
+	Waitmsg	*w;
+	int	pid;
+	char	*argv[] = { "/bin/rc", "-c", cmd, NULL };
+	
+	switch (pid = fork()) {
+	case -1:
+		return -1;
+	case 0:
+		exec(argv[0], argv);
+		bye(1);
+	default:
+		while ((w = wait()) != NULL) {
+			if (w->pid == pid) {
+				if (w->msg[0] == 0) {
+					free(w);
+					return 0;
+				}
+				free(w);
+				return 1;
+			}
+			free(w);
+		}
+		return 0;
+	}
+}
+
+#endif /* plan9 */
 
 /*
  * Bignums

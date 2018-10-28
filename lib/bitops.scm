@@ -17,6 +17,7 @@
 ; (bitca integer1 integer2 ...)  ==>  integer | #f
 ; (bitc+ integer1 integer2 ...)  ==>  integer | #f
 ; (bitn* integer1 integer2 ...)  ==>  integer | #f
+; (bit1  integer1 integer2 ...)  ==>  integer | #f
 ; (bitsl integer1 integer2 ...)  ==>  integer | #f
 ; (bitsr integer1 integer2 ...)  ==>  integer | #f
 ;

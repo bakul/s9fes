@@ -1,4 +1,12 @@
 
+2018-10-28
+
+	Added system() function for Plan 9 to S9core. Thanks, Bakul!
+
+	Fix: PROCEDURE? returned #F for extension procedures. (s9.c)
+
+	Retired lib/catch.scm (moved from lib/ to attic/).
+
 2018-10-27
 
 	Removed symbolic links from help/ directory, because some

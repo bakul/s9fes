@@ -8,6 +8,7 @@ s9/README
 s9/README.s9core
 s9/TODO
 s9/_csums
+s9/attic/catch.scm
 s9/config.scm
 s9/configure
 s9/contrib/S9Book
@@ -252,6 +253,7 @@ s9/help/pushb
 s9/help/quartile
 s9/help/quasiquote
 s9/help/queens
+s9/help/queue
 s9/help/quicksort
 s9/help/quit
 s9/help/quote
@@ -450,7 +452,6 @@ s9/lib/assp.scm
 s9/lib/basename.scm
 s9/lib/bitops.scm
 s9/lib/bitwise-ops.scm
-s9/lib/catch.scm
 s9/lib/cdf.scm
 s9/lib/char-canvas.scm
 s9/lib/char-plot.scm

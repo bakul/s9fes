@@ -58,6 +58,8 @@
 
 	- Statically or dynamically linked
 
+	- A system() function for Plan 9
+
 	- Available on Unix, Plan 9, and in C89/POSIX environments
 
 	----------------------------------------------------------------
@@ -604,7 +606,7 @@
 	-10^S9_DITIGS_PER_CELL + 1  to  10^S9_DITIGS_PER_CELL - 1
 
 	To create larger bignum integers, the string_to_bignum()
-	function  has to be used.
+	function has to be used.
 
 	The bignum_to_int() accessor returns the value of a
 	single-segment bignum integer or UNDEFINED, if the bignum
@@ -1911,6 +1913,12 @@
 	to measure the lengthts of NIL-terminated /or/ improper (dotted)
 	lists. Because it only counts pairs/conses, It cannot be used to
 	measure chains of atoms.
+
+	----- int system(char *cmd); -----------------------------------
+
+	This is an implementation of the ANSI C system() function for
+	Plan 9. It does not support system(NULL), but should be otherwise
+	compatible.
 
 	----------------------------------------------------------------
 	CAVEATS

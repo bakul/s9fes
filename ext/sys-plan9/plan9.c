@@ -1110,41 +1110,6 @@ cell pp_sys_magic_const(cell x) {
 	return FALSE;
 }
 
-int system(const char* cmd) {
-	Waitmsg *w;
-	int pid;
-	char *argv[] = { "/bin/rc", "-c", cmd, NULL };
-	
-	switch (pid = fork()) {
-	case -1:
-		return -1;
-	case 0:
-		exec(argv[0], argv);
-		return -1;	
-	default:
-		while ((w = wait()) != NULL) {
-			if (w->pid == pid) {
-				if (w->msg[0] == 0) {
-					free(w);
-					return 0;
-				}
-				strcpy(Last_errstr, w->msg);
-				free(w);
-				return 1;
-			}
-			free(w);
-		}
-		return 0;
-	}
-}
-
-cell pp_sys_system(cell x) {
-	int r = system(string(car(x)));
-	if (r)
-		return sys_error("sys:system", x);
-	return make_integer(r);
-}
-
 S9_PRIM Plan9_primitives[] = {
  {"sys:alarm",      pp_sys_alarm,      1, 1, { INT,___,___ } },
  {"sys:await",      pp_sys_await,      0, 0, { ___,___,___ } },
@@ -1203,7 +1168,9 @@ S9_PRIM Plan9_primitives[] = {
 #endif
  {"sys:sleep",      pp_sys_sleep,      1, 1, { INT,___,___ } },
  {"sys:stat",       pp_sys_stat,       1, 1, { STR,___,___ } },
- {"sys:system",     pp_sys_system,     1, 1, { STR,___,___ } },
+#ifdef FOO
+ {"sys:sysr1",      pp_sys_sysr1,      0, 0, { ___,___,___ } },
+#endif
  {"sys:unmount",    pp_sys_unmount,    2, 2, { STR,STR,___ } },
  {"sys:wait",       pp_sys_wait,       0, 0, { ___,___,___ } },
  {"sys:waitpid",    pp_sys_waitpid,    0, 0, { ___,___,___ } },

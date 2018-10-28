@@ -6,7 +6,7 @@
  * https://creativecommons.org/share-your-work/public-domain/cc0/
  */
 
-#define RELEASE_DATE	"2018-10-27"
+#define RELEASE_DATE	"2018-10-28"
 #define PATCHLEVEL	0
 
 #include "s9core.h"
@@ -744,25 +744,6 @@ cell subvector(cell x, int k0, int k1) {
 		j++;
 	}
 	return n;
-}
-
-cell argument_vector(char **argv) {
-	int	i;
-	cell	a, n;
-
-	if (NULL == argv[0]) return NIL;
-	a = cons(NIL, NIL);
-	save(a);
-	for (i = 0; argv[i] != NULL; i++) {
-		n = make_string(argv[i], strlen(argv[i]));
-		car(a) = n;
-		if (argv[i+1] != NULL) {
-			n = cons(NIL, NIL);
-			cdr(a) = n;
-			a = cdr(a);
-		}
-	}
-	return unsave(1);
 }
 
 cell list_to_vector(cell m, char *msg, int flags) {
@@ -3396,7 +3377,6 @@ int apply(int tail) {
 		if (continuation_p(Acc)) {
 			return call_cont(Acc, arg(1));
 		}
-printf("%d ", Ip); print_form(Prog); nl();
 		error("application of non-function", Acc);
 	}
 	if (tail) {
@@ -4756,7 +4736,9 @@ void run(cell x) {
 		skip(1);
 		break;
 	case OP_PROCEDURE_P:
-		Acc = function_p(Acc) || continuation_p(Acc)? TRUE: FALSE;
+		Acc = function_p(Acc) ||
+		      continuation_p(Acc) ||
+		      primitive_p(Acc)? TRUE: FALSE;
 		skip(1);
 		break;
 	case OP_INPUT_PORT_P:
@@ -5668,7 +5650,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	unsave(2);
-	Argv = NULL == argv[i]? NIL: argument_vector(&argv[i+1]);
+	Argv = NULL == argv[i]? NIL: argv_to_list(&argv[i+1]);
 	setbind(S_arguments, Argv);
 	if (dump != NULL) {
 		dump_image(dump, S9magic);

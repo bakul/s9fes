@@ -1,0 +1,17 @@
+S9fES  (s9:bytecode procedure)  ==>  vector
+
+Return a vector containing the bytecode of the given PROCEDURE.
+The resulting vector will contain the entire compilation unit
+in which the given procedure was defined, including details such
+as the assignment to the environment slot of its symbol. When
+multiple procedures are defined inside of a BEGIN block, the
+compilation block will contain all definitions of that block.
+
+The bytecode instructions contained in the vector are subject
+to change without notice.
+
+Rationale:
+
+The S9:BYTECODE procedure is intended to support procedures that
+are internal to the S9 interpreter, such as a disassembler. No
+user code would normally want to apply this procedure.

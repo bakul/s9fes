@@ -340,6 +340,7 @@ fi
 if [ $update_only = no -o $update_only = nah ]; then
 	naah "" directory help
 	naah "" directory freebsd-port
+	naah "" directory attic
 	naah contrib file S9Book
 	naah contrib file S9Book-bw
 	naah prog file adventure.intro
