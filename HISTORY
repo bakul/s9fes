@@ -1,33 +1,62 @@
 
+2018-10-27
+
+	Removed symbolic links from help/ directory, because some
+	operating systems do not have symlinks and tar(1) may report
+	errors in this case. The symlinks will be rebuild (or files
+	copied) during the build process. (help/)
+	Thanks, Bakul, for the suggestion!
+
+	Added S9:BYTECODE operator for accessing the bytecode of a
+	procedure. (s9.c)
+
+	Fix: aborting interpreter start-up when an image load fails.
+
 2018-10-26
+
 	Installed patches for the Plan 9 build submitted by Bakul Shah
-	and McKay Marston. Thank you very much!
+	and McKay Marston. Thank you very much! (If it still does not
+	work, it's my fault alone!)
+
 	Fix: Reference trace was in wrong order in error messages. (s9.c)
+
 	Fix: GC leak in the compiler. (s9.c)
+
 	Added CATCH-ERRORS form. (s9.c, s9.scm)
+
 2018-10-25
+
 	Added CATCH and THROW procedures. (s9.c)
+
 	Error messages are now printed to stdout unless the interpreter
 	is run in quiet mode (which is implied when running programs in
 	batch mode). (s9.c)
+
 	Fix: SIGINT was caught in quiet mode. (s9.c)
+
 	Longjmp'ing out of a signal handler may cause portability issues,
 	even if POSIX allows it. Worked around it. (s9.c)
 	Thanks, Bakul Shah, for pointing this out!
+
 	util/fix-help-links is now called util/fix-links.sh (for Unix)
 	and util/fix-links.rc (for Plan 9). (util/)
+
 2018-10-24
+
 	Forgot:
 	Policy change: image files are now loaded from the directory
 	specified in the S9FES_IMAGE_DIR environment variable or from
 	*one* directory specified in IMAGE_DIR (s9.c). When no image
 	can be found there, "./s9.image" will be tried. When this fails,
 	too, the interpreter will not start.
+
 	To load the library source code, "s9 -i -" *must* be used; this
 	is no longer a fallback.
+
 	Added S9FES-REIMAGINED and SCHEME-9-FROM-EMPTY-SPACE-REIMAGINED
 	feature ID's to COND-EXPAND, so you can distinguish between the
 	old and new S9 version. (lib/)
+
 	Added the *RELEASE-DATE* top-level variable that is bound to a
 	copy of the compiled-in RELEASE_DATE of the interpreter. (lib/)
 	Thanks for the idea, Peter!

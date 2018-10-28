@@ -12,7 +12,7 @@
 	- support for low-level Unix programming
 	- cursor addressing with Curses
 	- basic networking procedures
-	- integrated online help system
+	- an integrated online help system
 	- loads of useful library functions
 
 	It is written in ANSI C (C89) and Scheme and runs in many
@@ -43,29 +43,35 @@
 
 	QUICK START
 
-	You can run the interpreter in its build directory without
+	You can run an S9 interpreter in its build directory without
 	installing it. Just type
 
-		cc -o s9 s9.c s9core.c
-		./s9 -i - -d s9.image
+	    cc -o s9 s9.c s9core.c
+	    ./s9 -i - -d s9.image
 
 	and then "./s9". You might have to add -Dplan9 on Plan 9 systems.
+	The interpreter will support full R4RS Scheme, but none of the
+	extensions provided by S9 (Unix system calls, Curses, etc).
 
-	The S9 code is only loosely coupled to its Makefile, so in most
-	cases running "cc" as above will compile the interpreter just
-	fine. (However, doing so will not include the Unix, Curses, and
-	Networking extensions.)
+	A quick test of the interpreter can be performed by running
+
+	    ./s9 util/test.scm
+
+	In order to bring up the online help system, run
+
+	    sh util/fix-links.sh
+	    ./s9 -l contrib/help.scm -d s9.image
+
+	When running ./s9 for the next time, the following help commands
+	will be available:
+
+	    ,h  explain the online help system
+	    ,a  return a list of all help topics (long!)
 
 	On most systems of the Unix family (plus CygWin and MinGW),
 	you can compile and install S9fES by running "make install".
 
-	Once installed, typing "s9" will start the interpreter.
-
-	,h  explains the online help system.
-	,a  returns a list of all help topics (long!).
-
-	If the above commands do not work, try  ,l contrib/help.scm
-	first.
+	See below for further instructions.
 
 
 	COMPILING AND INSTALLING
@@ -83,14 +89,10 @@
 	You can install S9fES (including the goodies) on a Unix system
 	by typing "make install" as root, but before doing so, please
 	edit at least the PREFIX variable at the beginning of Makefile.
-	(Be sure to re-compile S9fES (make clean; make) after changing
-	 PREFIX, because it is used to set up some internal paths).
+	Be sure to re-compile S9fES (make clean; make) after changing
+	PREFIX, because it is used to set up some internal paths.
 
 	Plan 9
-
-	Before installing, run "rc util/fix-links.rc". The help/
-	directory contains symlinks, and the above script replaces
-	them by copies.
 
 	To compile S9fES on Plan 9 from Bell Labs, just type "mk".
 	The "test" and "tests" targets will run tests, just like on
@@ -167,8 +169,8 @@
 	make it point to S9DIR as well as other directories that
 	contain Scheme programs. The variable may contain a single
 	directory or a colon-separated list of directories that will be
-	searched in sequence for library files, and help pages (in
-	"help" subdirectories contained in the given paths).
+	searched in sequence for library files and help pages (in "help"
+	subdirectories contained in the given paths).
 
 	S9FES_LIBRARY_PATH overrides LIBRARY_PATH, so all directories
 	listed in the latter should also be present in the former.

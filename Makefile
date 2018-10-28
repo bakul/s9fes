@@ -8,7 +8,7 @@ PREFIX= /u
 
 # Base version and Release
 BASE=		20181002
-RELEASE=	20181025
+RELEASE=	20181027
 
 # Override default compiler and flags
 CC=	cc
@@ -65,7 +65,7 @@ BUILD_ENV=	env S9FES_LIBRARY_PATH=.:lib:ext/sys-unix:ext/curses:ext/csv:contrib 
 
 SETPREFIX=	sed -e "s|^\#! /usr/local|\#! $(PREFIX)|"
 
-default:	s9 s9.image s9.1.gz s9.1.txt libs9core.a
+default:	s9 s9.image s9.1.gz s9.1.txt libs9core.a help/apropos
 
 all:	default
 
@@ -84,6 +84,9 @@ s9.image:	s9 s9.scm ext/sys-unix/unix.scm ext/curses/curses.scm \
 
 libs9core.a: s9core.o
 	ar q libs9core.a s9core.o
+
+help/apropos:
+	sh util/fix-links.sh
 
 s9.1.gz:	s9.1
 	sed -e "s,@S9DIR@,$(S9DIR)," <s9.1 |gzip -9 >s9.1.gz
@@ -126,7 +129,7 @@ install-all:	install-s9 install-util install-progs
 
 # old version of install(1) may need -c
 #C=-c
-install-s9:	s9 s9.scm s9.image s9.1.gz
+install-s9:	s9 s9.scm s9.image s9.1.gz libs9core.a
 	install -d -m 0755 $(S9DIR)
 	install -d -m 0755 $(S9DIR)/help
 	install -d -m 0755 $(S9DIR)/help/sys-unix
@@ -272,8 +275,9 @@ mksums:	clean
 
 dist:	clean s9.1.txt
 	make clean
+	cd .. && find s9 -type f | sort >s9/MANIFEST
 	cd .. && \
-		tar cf - s9 | gzip -9 > s9fes-$(RELEASE).tgz && \
+		tar cfT - s9/MANIFEST | gzip -9 > s9fes-$(RELEASE).tgz && \
 		mv s9fes-$(RELEASE).tgz s9
 	ls -l s9fes-$(RELEASE).tgz | awk '{print int($$5/1024+.5)}'
 
@@ -282,6 +286,8 @@ cdist:
 		| gzip -9 > s9core-$(RELEASE).tgz 
 
 arc:	clean s9.1.txt
-	cd .. && tar cf - s9 | gzip -9 > s9fes-$(BASE).tgz && \
+	cd .. && find s9 -type f | sort >s9/MANIFEST
+	cd .. && tar cfT - s9/MANIFEST | gzip -9 > s9fes-$(BASE).tgz && \
 		mv s9fes-$(BASE).tgz s9
+	rm MANIFEST
 	ls -l s9fes-$(BASE).tgz | awk '{print int($$5/1024+.5)}'

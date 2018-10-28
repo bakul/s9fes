@@ -11,6 +11,7 @@ $cp amb amb-donep
 $cp amb amb-reset
 $cp assq assoc
 $cp assq assv
+$cp bit0 bit1
 $cp bit0 bitstar
 $cp bit0 bitstarc
 $cp bit0 bita
@@ -263,11 +264,10 @@ $cp pushb set-varsb
 $cp pushb swapb
 $cp quasiquote unquote
 $cp quasiquote unquote-splicing
-$cp queue make-queue
-$cp queue queue-emptyp
-$cp queue queueb
-$cp queue unqueueb
-$cp queue unqueuestar
+$cp make-queue queue-emptyp
+$cp make-queue queueb
+$cp make-queue unqueueb
+$cp make-queue unqueuestar
 $cp quotient modulo
 $cp quotient remainder
 $cp r4rs-procedures r4rs-syntax-objects
@@ -347,6 +347,7 @@ cd sys-unix; $cp sys_dup sys_dup2; cd ..
 cd sys-unix; $cp sys_getgrnam sys_getgrgid; cd ..
 cd sys-unix; $cp sys_getpgid sys_setpgid; cd ..
 cd sys-unix; $cp sys_getpwnam sys_getpwuid; cd ..
+cd sys-unix; $cp sys_gettimeofday sys_time; cd ..
 cd sys-unix; $cp sys_getuid sys_getgid; cd ..
 cd sys-unix; $cp sys_group-name sys_group-gid; cd ..
 cd sys-unix; $cp sys_inet-listen sys_inet-accept; cd ..

@@ -6,8 +6,8 @@
  * https://creativecommons.org/share-your-work/public-domain/cc0/
  */
 
-#define RELEASE_DATE	"2018-10-26"
-#define PATCHLEVEL	1
+#define RELEASE_DATE	"2018-10-27"
+#define PATCHLEVEL	0
 
 #include "s9core.h"
 #include "s9import.h"
@@ -183,14 +183,14 @@ cell	P_abs, P_append, P_assq, P_assv, P_bit_op, P_boolean_p,
 	P_open_output_file, P_output_port_p, P_pair_p,
 	P_peek_char, P_plus, P_positive_p, P_procedure_p,
 	P_quit, P_quotient, P_read, P_read_char, P_real_p,
-	P_remainder, P_reverse, P_reverse_b, P_set_car_b,
-	P_set_cdr_b, P_set_input_port_b, P_set_output_port_b,
-	P_stats, P_string_append, P_string_ci_equal,
-	P_string_ci_grtr, P_string_ci_gteq, P_string_ci_less,
-	P_string_ci_lteq, P_string_copy, P_string_equal,
-	P_string_fill_b, P_string_grtr, P_string_gteq,
-	P_string_length, P_string_less, P_string_lteq,
-	P_string_p, P_string_ref, P_string_set_b,
+	P_remainder, P_reverse, P_reverse_b, P_s9_bytecode,
+	P_set_car_b, P_set_cdr_b, P_set_input_port_b,
+	P_set_output_port_b, P_stats, P_string_append,
+	P_string_ci_equal, P_string_ci_grtr, P_string_ci_gteq,
+	P_string_ci_less, P_string_ci_lteq, P_string_copy,
+	P_string_equal, P_string_fill_b, P_string_grtr,
+	P_string_gteq, P_string_length, P_string_less,
+	P_string_lteq, P_string_p, P_string_ref, P_string_set_b,
 	P_string_to_list, P_string_to_symbol, P_substring,
 	P_symbol_p, P_symbol_p, P_symbol_to_string, P_symbols,
 	P_system_command, P_throw, P_times, P_truncate,
@@ -248,22 +248,23 @@ enum	{ OP_APPLIS, OP_APPLY, OP_ARG, OP_COPY_ARG, OP_CLOSURE,
 	  OP_PEEK_CHAR, OP_PLUS, OP_POSITIVE_P, OP_PROCEDURE_P,
 	  OP_QUIT, OP_QUOTE, OP_QUOTIENT, OP_READ, OP_READ_CHAR,
 	  OP_REAL_P, OP_REMAINDER, OP_REVERSE, OP_REVERSE_B,
-	  OP_SET_CAR_B, OP_SET_CDR_B, OP_SET_INPUT_PORT_B,
-	  OP_SET_OUTPUT_PORT_B, OP_STATS, OP_STRING_APPEND,
-	  OP_STRING_COPY, OP_STRING_EQUAL_P, OP_STRING_FILL_B,
-	  OP_STRING_GRTR_P, OP_STRING_GTEQ_P, OP_STRING_LENGTH,
-	  OP_STRING_LESS_P, OP_STRING_LTEQ_P, OP_STRING_P,
-	  OP_STRING_REF, OP_STRING_SET_B, OP_STRING_SI_EQUAL_P,
-	  OP_STRING_SI_GRTR_P, OP_STRING_SI_GTEQ_P,
-	  OP_STRING_SI_LESS_P, OP_STRING_SI_LTEQ_P,
-	  OP_STRING_TO_LIST, OP_STRING_TO_SYMBOL, OP_SUBSTRING,
-	  OP_SYMBOLS, OP_SYMBOL_P, OP_SYMBOL_TO_STRING,
-	  OP_SYSTEM_COMMAND, OP_THROW, OP_TIMES, OP_TRUNCATE,
-	  OP_UNQUOTE, OP_UNQUOTE_SPLICING, OP_VECTOR,
-	  OP_VECTOR_APPEND, OP_VECTOR_COPY, OP_VECTOR_FILL_B,
-	  OP_VECTOR_LENGTH, OP_VECTOR_P, OP_VECTOR_REF,
-	  OP_VECTOR_SET_B, OP_VECTOR_TO_LIST, OP_WRITE,
-	  OP_WRITE_CHAR, OP_ZERO_P };
+	  OP_S9_BYTECODE, OP_SET_CAR_B, OP_SET_CDR_B,
+	  OP_SET_INPUT_PORT_B, OP_SET_OUTPUT_PORT_B, OP_STATS,
+	  OP_STRING_APPEND, OP_STRING_COPY, OP_STRING_EQUAL_P,
+	  OP_STRING_FILL_B, OP_STRING_GRTR_P, OP_STRING_GTEQ_P,
+	  OP_STRING_LENGTH, OP_STRING_LESS_P, OP_STRING_LTEQ_P,
+	  OP_STRING_P, OP_STRING_REF, OP_STRING_SET_B,
+	  OP_STRING_SI_EQUAL_P, OP_STRING_SI_GRTR_P,
+	  OP_STRING_SI_GTEQ_P, OP_STRING_SI_LESS_P,
+	  OP_STRING_SI_LTEQ_P, OP_STRING_TO_LIST,
+	  OP_STRING_TO_SYMBOL, OP_SUBSTRING, OP_SYMBOLS,
+	  OP_SYMBOL_P, OP_SYMBOL_TO_STRING, OP_SYSTEM_COMMAND,
+	  OP_THROW, OP_TIMES, OP_TRUNCATE, OP_UNQUOTE,
+	  OP_UNQUOTE_SPLICING, OP_VECTOR, OP_VECTOR_APPEND,
+	  OP_VECTOR_COPY, OP_VECTOR_FILL_B, OP_VECTOR_LENGTH,
+	  OP_VECTOR_P, OP_VECTOR_REF, OP_VECTOR_SET_B,
+	  OP_VECTOR_TO_LIST, OP_WRITE, OP_WRITE_CHAR, OP_ZERO_P
+	  };
 
 /*
  * Types
@@ -980,6 +981,7 @@ void init(void) {
 	init_rts();
 	image_vars(Image_vars);
 	exponent_chars("eEdDfFlLsS");
+	memset(S9magic, 0, sizeof(S9magic));
 	if (strlen(RELEASE_DATE) == 10)
 		sprintf(S9magic, "S9:%s:%c", RELEASE_DATE, PATCHLEVEL+'0');
 	else
@@ -1153,6 +1155,7 @@ void init(void) {
 	P_remainder = symbol_ref("remainder");
 	P_reverse = symbol_ref("reverse");
 	P_reverse_b = symbol_ref("reverse!");
+	P_s9_bytecode = symbol_ref("s9:bytecode");
 	P_set_car_b = symbol_ref("set-car!");
 	P_set_cdr_b = symbol_ref("set-cdr!");
 	P_set_input_port_b = symbol_ref("set-input-port!");
@@ -1244,15 +1247,19 @@ void load_initial_image(char *image) {
 	}
 	else if (exists_p(path) != FALSE) {
 		s = load_image(path, S9magic);
-		if (s != NULL)
+		if (s != NULL) {
 			error(s, make_string(path, strlen(path)));
+			fatal("aborting");
+		}
 		setbind(S_image_file,
 			make_string(path, strlen(path)));
 	}
 	else if (exists_p(IMAGE_FILE) != FALSE) {
 		s = load_image(IMAGE_FILE, S9magic);
-		if (s != NULL)
+		if (s != NULL) {
 			error(s, make_string(path, strlen(path)));
+			fatal("aborting");
+		}
 		setbind(S_image_file,
 			make_string(IMAGE_FILE, strlen(IMAGE_FILE)));
 	}
@@ -2630,6 +2637,7 @@ int subr1p(cell x) {
 	if (x == P_real_p)		return OP_REAL_P;
 	if (x == P_reverse)		return OP_REVERSE;
 	if (x == P_reverse_b)		return OP_REVERSE_B;
+	if (x == P_s9_bytecode)		return OP_S9_BYTECODE;
 	if (x == P_set_input_port_b)	return OP_SET_INPUT_PORT_B;
 	if (x == P_set_output_port_b)	return OP_SET_OUTPUT_PORT_B;
 	if (x == P_stats)		return OP_STATS;
@@ -4286,6 +4294,20 @@ cell getenvvar(char *s) {
 	return make_string(p, strlen(p));
 }
 
+cell cvt_bytecode(cell x) {
+	cell	b, *v;
+	int	i, k;
+
+	k = vector_len(x);
+	b = subvector(x, 0, k);
+	v = vector(b);
+	for (i=0; i<k; i++) {
+		if (fix_p(v[i]))
+			car(v[i]) = T_INTEGER;
+	}
+	return b;
+}
+
 /* Main interpreter loop */
 
 void reset_tty(void);
@@ -4844,6 +4866,11 @@ void run(cell x) {
 	case OP_REVERSE_B:
 		if (!list_p(Acc)) expect("reverse!", "list", Acc);
 		Acc = nreverse(Acc);
+		skip(1);
+		break;
+	case OP_S9_BYTECODE:
+		if (!function_p(Acc)) expect("s9:bytecode", "procedure", Acc);
+		Acc = cvt_bytecode(closure_prog(Acc));
 		skip(1);
 		break;
 	case OP_STATS:

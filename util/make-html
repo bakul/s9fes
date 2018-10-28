@@ -283,7 +283,7 @@ if [ $update_only = no -o $update_only = dir ]; then
 fi
 
 if [ $update_only = no -o $update_only = txt ]; then
-	format_txt_files "" HISTORY LICENSE PREHISTORY
+	format_txt_files "" HISTORY LICENSE PREHISTORY MANIFEST
 	format_txt_files "" Makefile README TODO README.s9core
 	format_txt_files "" configure _csums mkfile s9.1.txt s9core.txt
 	format_txt_files lib lib/_template

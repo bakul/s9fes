@@ -1264,6 +1264,7 @@
 (define (procedure? x) (procedure? x))
 (define (real? x) (real? x))
 (define (reverse! x) (reverse! x))
+(define (s9:bytecode x) (s9:bytecode x))
 (define (set-input-port! x) (set-input-port! x))
 (define (set-output-port! x) (set-output-port! x))
 (define (stats x) (stats x))

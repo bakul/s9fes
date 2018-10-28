@@ -11,7 +11,7 @@ EXTRASCM=	-l ext/sys-plan9/plan9.scm -l ext/sys-plan9/plan9-tools.scm
 
 s9dir=		/lib/s9fes
 
-all:V: s9 s9.image
+all:V: s9 s9.image help/apropos
 
 tests:V: test realtest srtest libtest
 
@@ -27,6 +27,9 @@ plan9.$O: ext/sys-plan9/plan9.c
 
 s9-ffi.$O:	ext/sys-plan9/s9-ffi.c
 	$CC $CFLAGS ext/sys-plan9/s9-ffi.c
+
+help/apropos:
+	rc util/fix-links.rc
 
 libtest:V: s9 test.image
 	ape/psh util/$target.sh
