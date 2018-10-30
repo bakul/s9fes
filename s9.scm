@@ -552,8 +552,8 @@
   (define (l-series x y r last lim)
     (let ((x (/ (- x 1) (+ x 1))))
       (l-series6 x y x r last lim)))
-  (cond ((negative? x)
-          (/ 1.0 0))
+  (cond ((not (positive? x))
+          (/ 0))
         ((< 0.1 x 5)
           (l-series x 1 0.0 1.0 #f))
         (else

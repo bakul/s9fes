@@ -126,6 +126,7 @@ s9/help/define-syntax
 s9/help/delete-file
 s9/help/depth
 s9/help/dirname
+s9/help/disassemble
 s9/help/display
 s9/help/displaystar
 s9/help/do
@@ -253,7 +254,6 @@ s9/help/pushb
 s9/help/quartile
 s9/help/quasiquote
 s9/help/queens
-s9/help/queue
 s9/help/quicksort
 s9/help/quit
 s9/help/quote
@@ -464,6 +464,7 @@ s9/lib/data-structures.scm
 s9/lib/define-structure.scm
 s9/lib/depth.scm
 s9/lib/dirname.scm
+s9/lib/disassemble.scm
 s9/lib/displaystar.scm
 s9/lib/duplicates.scm
 s9/lib/equal-cip.scm

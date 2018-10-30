@@ -1,4 +1,12 @@
 
+2018-10-29
+
+	Added bytecode disassembler. (lib/disassemble.scm)
+
+	Fixed a bug in the library test suite ("make libtest") that
+	would report a failed image load when upgrading to a new
+	version. (util/)
+
 2018-10-28
 
 	Added system() function for Plan 9 to S9core. Thanks, Bakul!

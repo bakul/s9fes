@@ -40,6 +40,11 @@
 	- SRFI-30: nested multi-line comments
 	- SRFI-43: vector library                      (subset)
 
+	Bakul Shah maintains a downstream repository with extended
+	Plan 9 support, like access to system functions and an FFI:
+	https://github.com/bakul/s9fes.  Please send any feedback
+	regarding the Plan 9 extension directly to him.
+
 
 	QUICK START
 
@@ -59,7 +64,8 @@
 
 	In order to bring up the online help system, run
 
-	    sh util/fix-links.sh
+	    sh util/fix-links.sh   # on Unix
+	    rc util/fix-links.rc   # on Plan 9
 	    ./s9 -l contrib/help.scm -d s9.image
 
 	When running ./s9 for the next time, the following help commands

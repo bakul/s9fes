@@ -31,6 +31,7 @@ data-structures.scm|-|Various data structures|-
 define-structure.scm|define-structure|-|Define structure types
 depth.scm|depth|-|Compute depth of an object
 dirname.scm|dirname|-|Extract the directory part of a path
+disassemble.scm|-|S9fES bytecode disassembler|-
 displaystar.scm|display*|-|Display multiple objects
 draw-tree.scm|draw-tree|-|Draw S-expressions in box notation
 dupes.scm|-|Find duplicate file names|-

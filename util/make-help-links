@@ -161,6 +161,7 @@ $cp define-class slot-ref
 $cp define-class slot-setb
 $cp define-matcher let-matcher
 $cp define-matcher make-matcher
+$cp disassemble disassemblestar
 $cp draw-tree dt
 $cp duplicates dupp
 $cp duplicates dupq

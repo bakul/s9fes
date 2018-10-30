@@ -1,0 +1,129 @@
+S9 LIB  (disassemble* procedure)  ==>  list
+        (disassemble procedure)   ==>  unspecific
+
+        (load-from-library "disassemble.scm")
+
+DISASSEMBLE disassembles the bytecode of the compilation
+unit containing the definition of the given PROCEDURE.
+The compilation block typically contains not only the
+code for the procedure itself, but also instructions for
+jumping over the body of the procecure, setting up its
+closure, and binding it to a location in the environment.
+When multiple procedures are defined in the same BEGIN
+block, all procedures contained in the block will be
+disassembled.
+
+The only specification of the Scheme 9 bytecode at the
+present moment is the source code of the compiler and
+abstract machine, so the output of these procedures will
+only make sense to those who are familiar with the
+internal mechanisms of Scheme 9. An incomplete summary
+can be found below.
+
+DISASSEMBLE* returns a list containing instructions and
+DISASSEMBLE pretty-prints code to the current output port.
+
+Scheme 9 Abstract Machine Summary
+
+The Scheme 9 abstract machine is an SECD-like machine with
+a unified return and data stack, a top of stack cache called
+the "accumulator", and vectors as environments.
+
+Single-operand instructions expect their arguments in the
+accumulator (A), two-operand instructions expect argument #1 in
+the accumulator and asrgument #2 on the top of the stack (S0),
+and three-argument instructions expect #1 in A, #2 in S0 and
+#3 in S1 (the stack element beneath S0). All instructions
+remove their operands from the stack and return their result
+in A.
+
+Many instructions resemble Scheme procedures. For instance,
+the OP:CONS instruction implements CONS and the OP_SUBSTRING
+instruction implements SUBSTRING. There are no variadic
+instructions. The expression (+ a b c), for instance, would
+compile to  A PUSH B PLUS PUSH C PLUS.
+
+Here is a summary of the instructions that DO NOT resemble
+built-in Scheme procedures:
+
+OP:APPLIS       |  A=procedure S0=list  -->  object
+OP:TAIL-APPLIS  |  A=procedure S0=list  -->  object
+Apply A to arguments in S0.
+OP:TAIL-APPLIS performs a tail call.
+
+OP:APPLY      |  A=procedure S0...Sn=objects  -->  object
+OP:TAILAPPLY  |  A=procedure S0...Sn=objects  -->  object
+Apply A to arguments on the stack.
+OP:TAIL-APPLY performs a tail call.
+
+OP:QUOTE x  |  -->  object
+Load A with x.
+
+OP:ARG n  |  -->  object
+Retrieve N'th procedure argument.
+
+OP:REF n sym  |  -->  object
+Retrieve the value from the N'th environment slot.
+SYM is the name of the symbol bound to the slot.
+
+OP:MAKE-ENV  n  |  -->  vector
+OP:PROP-ENV     |  -->  vector
+Create an empty environment vector with N slots.
+OP:PROP-ENV propagates (re-uses) the parent environment.
+
+OP:COPY-ARG n m  |  -->
+Copy the N'th procedure argument to slot M of the new
+environment.
+
+OP:COPY-REF  |  n m  -->
+Copy envirnment slot N of the parent environment to
+slot M of the new environment.
+
+OP:CLOSURE n  |  -->  procedure
+Create a procedure (closure) with entry point N. Fetch
+the new environment from A.
+
+OP:DEF-MACRO sym  |  procedure  -->
+Bind A to SYM in the macro symbol table.
+
+OP:ENTER n       |  -->
+Enter procedure. When there are not exactly N arguments on
+the stack, signal an error.
+
+OP:ENTER-COLL n  |  -->
+Enter procedure collecting arguments. When there are less
+than n arguments on the stack, signal an error. Collect
+excess arguments (>N) in a list and place them in the last
+argument.
+
+OP:RETURN  |  -->
+Return from procedure.
+
+OP:HALT  |  -->
+Halt program execution.
+
+OP:JMP k  |  -->
+Transfer control to address K.
+
+OP:JMP-FALSE  |  boolean  -->
+Transfer control to address K, if A equals #F.
+
+OP:JMP-TRUE  |  boolean -->
+Transfer control to address K, if A does not equal #F.
+
+OP:POP  |  -->  object
+Load S0 into A.
+
+OP:PUSH  |  object  -->
+Push A to the stack.
+
+OP:PUSH-VAL n  |  -->  object
+Push N to the stack.
+
+OP:SET-ARG n  |  object  -->
+Set the N'th argument to A.
+
+OP:SET-REF n  |  object  -->
+Set the N'th environment slot to A.
+
+No example given.
