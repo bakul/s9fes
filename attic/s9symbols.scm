@@ -1,12 +1,12 @@
 #! /usr/local/bin/s9 -f
 
 ; s9symbols -- print S9 symbols
-; by Nils M Holm, 2012
-; Placed in the Public Domain
+; by Nils M Holm, 2012,2018
+; In the public domain
 ;
 ; This procedure extracts all symbols from the S9 help files and
 ; dumps them to the output port. The resulting list can be used
-; as an auto-completion list for the S9 editor.
+; as an auto-completion list Scheme-aware editors.
 ;
 ; Usage: s9symbols
 
@@ -61,4 +61,3 @@
                            files)))
        (topics (remove "" (sort string-ci<=? topics))))
   (for-each (curryr display* #\newline) topics))
-

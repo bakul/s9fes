@@ -17,9 +17,9 @@ and INTEGER3 (B), etc.
   7 |     A  or      B  | OR
   8 | not(A  or      B) | NOR
   9 | not(A  xor     B) | NXOR
- 10 |            not(B) | NOT*
+ 10 |            not(B) | NOT *
  11 |     A  or  not(B) |
- 12 | not(A)            | NOT*
+ 12 | not(A)            | NOT *
  13 | not(A) or      B  |
  14 | not(A  and     B) | NAND
  15 | not(0)            | SET

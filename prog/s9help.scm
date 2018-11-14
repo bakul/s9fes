@@ -1,59 +1,58 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; s9help -- find and display S9fES help pages
-; by Nils M Holm, 2010,2015
-; Placed in the Public Domain
+; by Nils M Holm, 2010,2015,2018
+; In the public domain
 ;
 ; Usage: s9help [-als] topic ...
 ;
 ; Options:
 ;
 ; -a  find any match (default: full words only)
-; -l  long results (including context)
+; -c  check help database for missing files
+; -h  print help on help
+; -l  long search results (including context)
 ; -s  search help pages (default: display)
 
-(load-from-library "find-help.scm")
-(load-from-library "name-to-file-name.scm")
+(require-extension sys-unix)
+
+(load-from-library "find-help-page.scm")
+(load-from-library "scan-help-pages.scm")
 (load-from-library "read-line.scm")
 (load-from-library "parse-optionsb.scm")
 
 (define search     (option #\s #f))
 (define long       (option #\l #f))
 (define any-match  (option #\a #f))
+(define check      (option #\c #f))
 (define show-help  (option #\h #f))
 (define options    `(,search
                      ,long
                      ,any-match
+                     ,check
                      ,show-help))
 
 (define (usage)
-  (display "Usage: s9help [-als] topic ...")
+  (display "Usage: s9help [-achls] topic ...")
   (newline))
 
 (define (display-help topic)
-  (let loop ((exts (cons "." (map symbol->string *extensions*))))
-    (if (null? exts)
-        (begin (display* "s9: " topic ": help file not found" #\newline)
+  (let ((path (find-help-page topic)))
+    (if (not path)
+        (begin (display* "s9help: " topic ": help file not found" #\newline)
                (sys:exit 1))
-        (let ((path (string-append (find-help-path)
-                                   "/"
-                                   (car exts)
-                                   "/"
-                                   (name->file-name topic))))
-          (if (not (file-exists? path))
-              (loop (cdr exts))
-              (with-input-from-file
-                path
-                (lambda ()
+        (with-input-from-file
+          path
+          (lambda ()
+            (newline)
+            (let print ((line (read-line)))
+              (if (eof-object? line)
                   (newline)
-                  (let print ((line (read-line)))
-                    (if (eof-object? line)
-                        (newline)
-                        (begin (display line)
-                               (newline)
-                               (print (read-line))))))))))))
+                  (begin (display line)
+                         (newline)
+                         (print (read-line))))))))))
 
-(let ((topic* (parse-options! (sys:command-line) options usage)))
+(let ((topics (parse-options! (command-line) options usage)))
   (if (opt-val show-help)
       (begin (display-usage
                `(""
@@ -62,20 +61,26 @@
                  "Find and display S9fES help pages"
                  ""
                  "-a  find any match (default: full words only)"
-                 "-l  long results (including context)"
+                 "-c  check help database for missing files"
+                 "-l  print help on help"
+                 "-l  long search results (including context)"
                  "-s  search help pages (default: display)"
                  ""))
       (sys:exit 0)))
-  (let ((topic* (if (null? topic*)
-                    (begin (usage)
-                           (sys:exit 1))
-                    topic*)))
-    (for-each (lambda (topic)
-                (if (opt-val search)
-                    (find-help topic
-                               (string-append
-                                 "p"
-                                 (if (opt-val long) "l" "")
-                                 (if (opt-val any-match) "a" "")))
-                    (display-help topic)))
-              topic*)))
+  (if (opt-val check)
+      (for-each (lambda (x) (display* "missing: " x #\newline))
+                (scan-help-pages "" "c"))
+      (let ((topics (if (null? topics)
+                        (begin (usage)
+                               (sys:exit 1))
+                        topics)))
+        (for-each (lambda (topic)
+                    (if (opt-val search)
+                        (scan-help-pages
+                          topic
+                          (string-append
+                            "p"
+                            (if (opt-val long) "l" "")
+                            (if (opt-val any-match) "a" "")))
+                        (display-help topic)))
+                  topics))))

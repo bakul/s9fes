@@ -64,8 +64,6 @@
 
 	In order to bring up the online help system, run
 
-	    sh util/fix-links.sh   # on Unix
-	    rc util/fix-links.rc   # on Plan 9
 	    ./s9 -l contrib/help.scm -d s9.image
 
 	When running ./s9 for the next time, the following help commands
@@ -87,10 +85,6 @@
 	To compile S9fES, run "make" and then "make test" (this will run
 	the test suite to make sure that the interpreter works properly).
 	Running "make tests" will run even more tests.
-
-	On 64-bit platforms, you *can* enable 64-bit cells, but there
-	are not really any benefits to this. The default is to create
-	a system based on 32-bit cells, even on 64-bit platforms.
 
 	You can install S9fES (including the goodies) on a Unix system
 	by typing "make install" as root, but before doing so, please
@@ -117,7 +111,7 @@
 	To install S9fES manually,
 
 	- Compile s9 with a proper image directory and library path (the
-	  ones hardwired in "s9.h" are probably not what you want). E.g.:
+	  ones hardwired in "s9.c" are probably not what you want). E.g.:
 
 	  cc -o s9 -DIMAGE_DIR="\"dir\"" -DLIBRARY_PATH="\"path\"" \
 		s9.c s9core.c
@@ -171,8 +165,20 @@
 
 	CONFIGURATION
 
-	You may create the S9FES_LIBRARY_PATH environment variable and
-	make it point to S9DIR as well as other directories that
+	To create an image file containing additional functionality,
+	add the desired options to the "config.scm" file, run
+
+	s9 -i - -l config.scm -d s9.image
+
+	and copy the resulting image to your IMAGE_DIR.
+
+	If you are keeping your image files in a location other than
+	S9DIR, you can create the S9FES_IMAGE_DIR environment variable
+	and make it point to your preferred location. In this case
+	"s9 -i foo.image" will load $S9FES_IMAGE_DIR/foo.image.
+
+	You may also create the S9FES_LIBRARY_PATH environment variable
+	and make it point to S9DIR as well as other directories that
 	contain Scheme programs. The variable may contain a single
 	directory or a colon-separated list of directories that will be
 	searched in sequence for library files and help pages (in "help"
@@ -180,19 +186,6 @@
 
 	S9FES_LIBRARY_PATH overrides LIBRARY_PATH, so all directories
 	listed in the latter should also be present in the former.
-
-	If you are keeping your image files in a location other than
-	S9DIR, you can create the S9FES_IMAGE_DIR environment variable
-	and make it point to your preferred location. In this case
-	"s9 -i foo.image" will load $S9FES_IMAGE_DIR/foo.image.
-
-	To create an image file containing additional functionality,
-	add the desired options to the "config.scm" file and run
-
-	s9 -i - -l config.scm -d s9.image
-
-	(This step is already included in the default Unix Makefile and
-	 Plan 9 mkfile).
 
 
 	GETTING STARTED

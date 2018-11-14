@@ -1,0 +1,10 @@
+S9 LIB  (find-help-page string)  ==>  string | #f
+
+Search the online help database for a file explaining the
+given topic. STRING may contain a Scheme 9 keyword, a
+procedure name, or the name of a special variable. When
+a file describing the desired topic exists, its full path
+will be returned. When no such file exists, the procedure
+returns #F.
+
+(find-help-page "help")  ==>  "path to help-page"

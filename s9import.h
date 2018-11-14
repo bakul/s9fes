@@ -1,5 +1,5 @@
 /*
- * S9core Toolkit, Mk IV
+ * S9core Toolkit, Mk IVc
  * By Nils M Holm, 2007-2018
  * In the public domain
  *
@@ -40,6 +40,7 @@
 #define T_SYNTAX	S9_T_SYNTAX
 #define T_VECTOR	S9_T_VECTOR
 #define T_CONTINUATION	S9_T_CONTINUATION
+#define T_FIXNUM	S9_T_FIXNUM
 #define T_NONE		S9_T_NONE
 
 #define USER_SPECIALS	S9_USER_SPECIALS
@@ -56,6 +57,8 @@
 #define vector_size	s9_vector_size
 #define vector_len	s9_vector_len
 #define port_no		s9_port_no
+#define fixval		s9_fixval
+#define small_int_value	s9_small_int_value
 #define char_value	s9_char_value
 #define prim_slot	s9_prim_slot
 #define prim_info	s9_prim_info
@@ -119,6 +122,7 @@
 #define function_p	s9_function_p
 #define continuation_p	s9_continuation_p
 #define real_p		s9_real_p
+#define fix_p		s9_fix_p
 #define char_p		s9_char_p
 #define syntax_p	s9_syntax_p
 #define input_port_p	s9_input_port_p
@@ -128,6 +132,7 @@
 #define string_p	s9_string_p
 #define atom_p		s9_atom_p
 #define pair_p		s9_pair_p
+#define small_int_p	s9_small_int_p
 #define type_tag	s9_type_tag
 
 #define cons		s9_cons
@@ -148,6 +153,9 @@
 #define Real_negative_p		S9_real_negative_p
 #define Real_positive_p		S9_real_positive_p
 #define Real_negate		S9_real_negate
+
+#define GC_stack	S9_gc_stack
+#define GC_stkptr	S9_gc_stkptr
 
 #ifndef S9_S9CORE
  #define apply_prim		s9_apply_prim
@@ -192,6 +200,7 @@
  #define inport_open_p		s9_inport_open_p
  #define integer_string_p	s9_integer_string_p
  #define intern_symbol		s9_intern_symbol
+ #define int_to_bignum		s9_int_to_bignum
  #define io_reset		s9_io_reset
  #define io_status		s9_io_status
  #define length			s9_length
@@ -206,6 +215,7 @@
  #define make_symbol		s9_make_symbol
  #define make_vector		s9_make_vector
  #define mem_error_handler	s9_mem_error_handler
+ #define mkfix			s9_mkfix
  #define new_port		s9_new_port
  #define new_vec		s9_new_vec
  #define open_input_port	s9_open_input_port

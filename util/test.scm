@@ -2388,7 +2388,7 @@
 (test (apply procedure? `(,(lambda (x) x))) #t)
 (test (apply real? '(1.0)) #t)
 (test (apply reverse '((1 2 3))) '(3 2 1))
-(test (apply reverse! '((1 2 3))) '(3 2 1))
+(test (apply reverse! (list (list 1 2 3))) '(3 2 1))
 ; set-input-port!
 ; set-output-port!
 (test (car (apply stats '((cons 1 2)))) '(1 . 2))

@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; cols -- format input in two columns
 ; by Nils M Holm, 2010

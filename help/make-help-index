@@ -1,0 +1,9 @@
+S9 LIB  (make-help-index)  ==>  list
+
+Return a comprehensive list of topics found in the online help
+database. Topics include procedures (like CAR and +), syntactic
+keywords (like IF and DEFINE) as well as special variables (such
+as *LIBRARY-PATH*). The returned list will be lexicographically
+sorted and free of duplicates.
+
+(make-help-index)  ==>  (list of procedures and keywords)

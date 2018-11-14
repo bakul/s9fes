@@ -24,7 +24,7 @@ int grow(cell n, int i, int k, int kk) {
 	return k;
 }
 
-cell pp_csv_read(cell x) {
+cell pp_csv_read(void) {
 	#define	L 256
 	cell	n, m;
 	int	f = 0, i = 0, k = 0;
@@ -94,14 +94,13 @@ cell pp_csv_read(cell x) {
 	return unsave(1);
 }
 
-cell pp_csv_write(cell x) {
+cell pp_csv_write(void) {
 	cell	p;
 	char	*s, b[3];
 
 	b[2] = 0;
-	for (p = car(x); p != NIL; p = cdr(p)) {
-		if (atom_p(x))
-			error("csv:write: improper list", car(x));
+	for (p = parg(1); p != NIL; p = cdr(p)) {
+		if (atom_p(p)) error("csv:write: improper list", parg(1));
 		prints("\"");
 		b[1] = 0;
 		for (s = string(car(p)); *s; s++) {

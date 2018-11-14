@@ -1,7 +1,7 @@
 /*
  * Scheme 9 from Empty Space, Unix Interface
- * By Nils M Holm, 2009-2016
- * Placed in the Public Domain
+ * By Nils M Holm, 2009-2018
+ * In the public domain
  *
  * A low-level interface to some Unix system services.
  */
@@ -13,14 +13,27 @@
 #ifndef _BSD_SOURCE
  #define _BSD_SOURCE
 #endif
+
 #ifndef __FreeBSD__
  #ifndef __NetBSD__
-  #ifndef _POSIX_SOURCE
-   #define _POSIX_SOURCE
-   #define _POSIX_C_SOURCE 200112L
-  #endif
-  #ifndef _XOPEN_SOURCE
-   #define _XOPEN_SOURCE 500
+  #ifndef __OpenBSD__
+
+   #ifndef _POSIX_SOURCE
+    #define _POSIX_SOURCE
+   #endif
+
+   #ifndef _XOPEN_SOURCE
+    #define _XOPEN_SOURCE
+   #endif
+
+   #ifndef _XOPEN_SOURCE_EXTENDED
+    #define _XOPEN_SOURCE_EXTENDED
+   #endif
+
+   #ifndef _DEFAULT_SOURCE
+    #define _DEFAULT_SOURCE
+   #endif
+
   #endif
  #endif
 #endif
@@ -88,25 +101,31 @@ static cell		New_node;
 cell	Last_errno = 0;
 cell	Catch_errors = 0;
 
-cell sys_error(char *who, cell what) {
+cell sys_error(char *who) {
 	char	buf[256];
 	char	*p, *q;
-	int	k;
+	int	i, k;
+	cell	a;
 
 	Last_errno = errno;
 	if (who) {
+		if (Catch_errors) return FALSE;
 		k = strlen(who);
 		strcpy(buf, who);
 		strcpy(&buf[k], ": ");
 		k += 2;
 		q = strerror(errno);
-		for (p = &buf[k]; *q && k < 255; k++)
+		for (p = &buf[k]; *q && k < 244; k++)
 			*p++ = tolower((int) *q++);
 		*p = 0;
-		if (Catch_errors)
-			return FALSE;
-		else
-			error(buf, what);
+		strcat(buf, ", arguments");
+		save(a = NIL);
+		for (i = narg(); i > 0; i--) {
+			a = cons(parg(i), a);
+			car(Stack) = a;
+		}
+		unsave(1);
+		error(buf, a);
 	}
 	return FALSE;
 }
@@ -115,98 +134,93 @@ cell sys_ok(void) {
 	return Catch_errors? TRUE: UNSPECIFIC;
 }
 
-cell pp_sys_access(cell x) {
-	return access(string(car(x)),
-		integer_value("sys:access", cadr(x))) < 0? FALSE: TRUE;
+cell pp_sys_access(void) {
+	return access(string(parg(1)),
+		integer_value("sys:access", parg(2))) < 0? FALSE: TRUE;
 }
 
-cell pp_sys_catch_errors(cell x) {
-	Catch_errors = car(x) == TRUE;
+cell pp_sys_catch_errors(void) {
+	Catch_errors = parg(1) == TRUE;
 	if (Catch_errors) Last_errno = 0;
 	return UNSPECIFIC;
 }
 
-cell pp_sys_chdir(cell x) {
-	if (chdir(string(car(x))) < 0)
-		return sys_error("sys:chdir", x);
+cell pp_sys_chdir(void) {
+	if (chdir(string(parg(1))) < 0)
+		return sys_error("sys:chdir");
 	return sys_ok();
 }
 
-cell pp_sys_close(cell x) {
-	if (close(integer_value("sys:close", car(x))) < 0)
-		return sys_error("sys:close", x);
+cell pp_sys_close(void) {
+	if (close(integer_value("sys:close", parg(1))) < 0)
+		return sys_error("sys:close");
 	return sys_ok();
 }
 
-cell pp_sys_chmod(cell x) {
+cell pp_sys_chmod(void) {
 	int	r;
 
-	r = chmod(string(car(x)), integer_value("sys:chmod", cadr(x)));
-	if (r < 0)
-		return sys_error("sys:chmod", x);
+	r = chmod(string(parg(1)), integer_value("sys:chmod", parg(2)));
+	if (r < 0) return sys_error("sys:chmod");
 	return sys_ok();
 }
 
-cell pp_sys_chown(cell x) {
+cell pp_sys_chown(void) {
 	int	r;
 
-	r = chown(string(car(x)),
-		integer_value("sys:chown", cadr(x)),
-		integer_value("sys:chown", caddr(x)));
-	if (r < 0)
-		return sys_error("sys:chown", x);
+	r = chown(string(parg(1)),
+		integer_value("sys:chown", parg(2)),
+		integer_value("sys:chown", parg(3)));
+	if (r < 0) return sys_error("sys:chown");
 	return sys_ok();
 }
 
-cell pp_sys_command_line(cell x) {
+cell pp_sys_command_line(void) {
 	extern cell	Argv;
 
 	return Argv;
 }
 
-cell pp_sys_creat(cell x) {
+cell pp_sys_creat(void) {
 	int	fd;
 
-	fd = open(string(car(x)), O_CREAT|O_TRUNC|O_WRONLY,
-			integer_value("sys:creat", cadr(x)));
-	if (fd < 0)
-		return sys_error("sys:creat", x);
+	fd = open(string(parg(1)), O_CREAT|O_TRUNC|O_WRONLY,
+			integer_value("sys:creat", parg(2)));
+	if (fd < 0) return sys_error("sys:creat");
 	return make_integer(fd);
 }
 
-cell pp_sys_dup(cell x) {
+cell pp_sys_dup(void) {
 	int	r;
 
-	r = dup(integer_value("sys:dup", car(x)));
-	if (r < 0)
-		return sys_error("sys:dup", x);
+	r = dup(integer_value("sys:dup", parg(1)));
+	if (r < 0) return sys_error("sys:dup");
 	return make_integer(r);
 }
 
-cell pp_sys_dup2(cell x) {
+cell pp_sys_dup2(void) {
 	int	r;
 	char	name[] = "sys:dup2";
 
-	r = dup2(integer_value(name, car(x)),
-			integer_value(name, cadr(x)));
-	if (r < 0)
-		return sys_error("sys:dup2", x);
+	r = dup2(integer_value(name, parg(1)),
+			integer_value(name, parg(2)));
+	if (r < 0) return sys_error("sys:dup2");
 	return make_integer(r);
 }
 
-cell pp_sys_errno(cell x) {
+cell pp_sys_errno(void) {
 	int	e = Last_errno;
 
 	Last_errno = 0;
 	return make_integer(e);
 }
 
-cell pp_sys_execv(cell x) {
+cell pp_sys_execv(void) {
 	char	**argv;
 	cell	p;
 	int	i;
 
-	for (p = cadr(x); p != NIL; p = cdr(p)) {
+	for (p = parg(2); p != NIL; p = cdr(p)) {
 		if (!pair_p(p))
 			error("sys:execv: improper list, last element is",
 				p);
@@ -214,54 +228,52 @@ cell pp_sys_execv(cell x) {
 			error("sys:execv: expected list of string, got",
 				car(p));
 	}
-	argv = malloc((length(cadr(x)) + 2) * sizeof(char *));
-	if (argv == NULL)
-		return sys_error("sys:execv", VOID);
-	argv[0] = string(car(x));
+	argv = malloc((length(parg(2)) + 2) * sizeof(char *));
+	if (argv == NULL) return sys_error("sys:execv");
+	argv[0] = string(parg(1));
 	i = 1;
-	for (p = cadr(x); p != NIL; p = cdr(p))
+	for (p = parg(2); p != NIL; p = cdr(p))
 		argv[i++] = string(car(p));
 	argv[i] = NULL;
-	execv(string(car(x)), argv);
+	execv(string(parg(1)), argv);
 	free(argv);
-	return sys_error("sys:execv", VOID);
+	return sys_error("sys:execv");
 }
 
-cell pp_sys_exit(cell x) {
+cell pp_sys_exit(void) {
 	int	r;
 
-	r = integer_value("sys:exit", car(x));
+	r = integer_value("sys:exit", parg(1));
 	if (r > 255 || r < 0)
-		error("sys:exit: value out of range", car(x));
+		error("sys:exit: value out of range", parg(1));
 	exit(r);
-	fatal("exit() failed");
+	fatal("sys:exit() failed");
 	return sys_ok();
 }
 
-cell pp_sys_fileno(cell x) {
-	if (!input_port_p(car(x)) && !output_port_p(car(x)))
-		error("sys:fileno: expected port, got", car(x));
-	if (Ports[port_no(car(x))] == NULL)
-		return sys_error("sys:fileno", x);
-	return make_integer(fileno(Ports[port_no(car(x))]));
+cell pp_sys_fileno(void) {
+	if (!input_port_p(parg(1)) && !output_port_p(parg(1)))
+		error("sys:fileno: expected port, got", parg(1));
+	if (Ports[port_no(parg(1))] == NULL)
+		error("sys:fileno: port not open", parg(1));
+	return make_integer(fileno(Ports[port_no(parg(1))]));
 }
 
-cell pp_sys_flush(cell x) {
-	if (fflush(Ports[port_no(car(x))]))
-		return sys_error("sys:flush", x);
+cell pp_sys_flush(void) {
+	if (fflush(Ports[port_no(parg(1))]))
+		return sys_error("sys:flush");
 	return sys_ok();
 }
 
-cell pp_sys_fork(cell x) {
+cell pp_sys_fork(void) {
 	int	pid;
 
 	pid = fork();
-	if (pid < 0)
-		return sys_error("sys:fork", VOID);
+	if (pid < 0) return sys_error("sys:fork");
 	return make_integer(pid);
 }
 
-cell pp_sys_getcwd(cell x) {
+cell pp_sys_getcwd(void) {
 	char	*s;
 	cell	n;
 
@@ -271,16 +283,15 @@ cell pp_sys_getcwd(cell x) {
 	return n;
 }
 
-cell pp_sys_getenv(cell x) {
+cell pp_sys_getenv(void) {
 	char	*s;
 
-	s = getenv(string(car(x)));
-	if (s == NULL)
-		return FALSE;
+	s = getenv(string(parg(1)));
+	if (NULL == s) return FALSE;
 	return make_string(s, strlen(s));
 }
 
-cell pp_sys_getgid(cell x) {
+cell pp_sys_getgid(void) {
 	return make_integer(getgid());
 }
 
@@ -299,36 +310,34 @@ cell mkgrent(struct group *gr) {
 	return n;
 }
 
-cell pp_sys_getgrnam(cell x) {
+cell pp_sys_getgrnam(void) {
 	struct group	*gr;
 
-	gr = getgrnam(string(car(x)));
-	if (gr == NULL)
-		return FALSE;
+	gr = getgrnam(string(parg(1)));
+	if (gr == NULL) return FALSE;
 	return mkgrent(gr);
 }
 
-cell pp_sys_getgrgid(cell x) {
+cell pp_sys_getgrgid(void) {
 	struct group	*gr;
 
-	gr = getgrgid(integer_value("sys:getgrgid", car(x)));
-	if (gr == NULL)
-		return FALSE;
+	gr = getgrgid(integer_value("sys:getgrgid", parg(1)));
+	if (gr == NULL) return FALSE;
 	return mkgrent(gr);
 }
 
-cell pp_sys_getpgid(cell x) {
+cell pp_sys_getpgid(void) {
 	/* No prototype, neither on FreeBSD 8.2 nor on Debian Lenny? */
 	pid_t	getpgid(pid_t);
 
 	return make_integer(getpgid(0));
 }
 
-cell pp_sys_getpid(cell x) {
+cell pp_sys_getpid(void) {
 	return make_integer(getpid());
 }
 
-cell pp_sys_getpwent(cell x) {
+cell pp_sys_getpwent(void) {
 	struct passwd	*pw;
 	cell		n, a, pa;
 
@@ -385,69 +394,65 @@ cell mkpwent(struct passwd *pw) {
 	return n;
 }
 
-cell pp_sys_getpwnam(cell x) {
+cell pp_sys_getpwnam(void) {
 	struct passwd	*pw;
 
-	pw = getpwnam(string(car(x)));
-	if (pw == NULL)
-		return FALSE;
+	pw = getpwnam(string(parg(1)));
+	if (pw == NULL) return FALSE;
 	return mkpwent(pw);
 }
 
-cell pp_sys_getpwuid(cell x) {
+cell pp_sys_getpwuid(void) {
 	struct passwd	*pw;
 
-	pw = getpwuid(integer_value("sys:getpwuid", car(x)));
-	if (pw == NULL)
-		return FALSE;
+	pw = getpwuid(integer_value("sys:getpwuid", parg(1)));
+	if (pw == NULL) return FALSE;
 	return mkpwent(pw);
 }
 
-cell pp_sys_getuid(cell x) {
+cell pp_sys_getuid(void) {
 	return make_integer(getuid());
 }
 
-cell pp_sys_kill(cell x) {
+cell pp_sys_kill(void) {
 	char	name[] = "sys:kill";
-	int	sig = integer_value(name, cadr(x));
+	int	sig = integer_value(name, parg(2));
 	int	r;
 
-	r = kill(integer_value(name, car(x)), sig);
-	if (r < 0)
-		return sys_error("sys:kill", x);
+	r = kill(integer_value(name, parg(1)), sig);
+	if (r < 0) return sys_error("sys:kill");
 	return sys_ok();
 }
 
-cell pp_sys_link(cell x) {
-	if (link(string(car(x)), string(cadr(x))) < 0)
-		return sys_error("sys:link", x);
+cell pp_sys_link(void) {
+	if (link(string(parg(1)), string(parg(2))) < 0)
+		return sys_error("sys:link");
 	return sys_ok();
 }
 
-cell pp_sys_lock(cell x) {
+cell pp_sys_lock(void) {
 	char	p[256], *s;
 
-	s = string(car(x));
+	s = string(parg(1));
 	if (strlen(s) > 248)
-		error("sys:lock: path too long", car(x));
+		error("sys:lock: path too long", parg(1));
 	sprintf(p, "%s.lock", s);
 	return (mkdir(p, 0700) < 0)? FALSE: TRUE;
 }
 
-cell pp_sys_lseek(cell x) {
+cell pp_sys_lseek(void) {
 	char	name[] = "sys:lseek";
 	long	r;
 
-	r = lseek(integer_value(name, car(x)),
-		integer_value(name, cadr(x)),
-		integer_value(name, caddr(x)));
-	if (r < 0L)
-		return sys_error("sys:lseek", x);
+	r = lseek(integer_value(name, parg(1)),
+		integer_value(name, parg(2)),
+		integer_value(name, parg(3)));
+	if (r < 0L) return sys_error("sys:lseek");
 	return make_integer(r);
 }
 
-cell pp_sys_get_magic_value(cell x) {
-	char	*s = string(car(x));
+cell pp_sys_get_magic_value(void) {
+	char	*s = string(parg(1));
 
 	if (!strcmp(s, "F_OK")) return make_integer(F_OK);
 	if (!strcmp(s, "X_OK")) return make_integer(X_OK);
@@ -490,51 +495,47 @@ cell pp_sys_get_magic_value(cell x) {
 	if (!strcmp(s, "S_IWOTH")) return make_integer(S_IWOTH);
 	if (!strcmp(s, "S_IXOTH")) return make_integer(S_IXOTH);
 	else error("sys:get-magic-value: requested value not found",
-			car(x));
+			parg(1));
 	return UNDEFINED;
 }
 
-cell pp_sys_make_input_port(cell x) {
+cell pp_sys_make_input_port(void) {
 	int	in = new_port();
 
-	if (in < 0)
-		error("sys:make-input-port: out of ports", VOID);
-	Ports[in] = fdopen(integer_value("sys:make-input-port", car(x)),
+	if (in < 0) error("sys:make-input-port: out of ports", VOID);
+	Ports[in] = fdopen(integer_value("sys:make-input-port", parg(1)),
 				"r");
 	return make_port(in, T_INPUT_PORT);
 }
 
-cell pp_sys_make_output_port(cell x) {
+cell pp_sys_make_output_port(void) {
 	int	out = new_port();
 
-	if (out < 0)
-		error("sys:make-output-port: out of ports", VOID);
-	Ports[out] = fdopen(integer_value("sys:make-output-port", car(x)),
+	if (out < 0) error("sys:make-output-port: out of ports", VOID);
+	Ports[out] = fdopen(integer_value("sys:make-output-port", parg(1)),
 				"w");
 	return make_port(out, T_OUTPUT_PORT);
 }
 
-cell pp_sys_mkdir(cell x) {
-	if (mkdir(string(car(x)), integer_value("sys:mkdir", cadr(x))) < 0)
-		return sys_error("sys:mkdir", x);
+cell pp_sys_mkdir(void) {
+	if (mkdir(string(parg(1)), integer_value("sys:mkdir", parg(2))) < 0)
+		return sys_error("sys:mkdir");
 	return sys_ok();
 }
 
-cell pp_sys_open(cell x) {
+cell pp_sys_open(void) {
 	int	fd;
 
-	fd = open(string(car(x)), integer_value("sys:open", cadr(x)));
-	if (fd < 0)
-		return sys_error("sys:open", x);
+	fd = open(string(parg(1)), integer_value("sys:open", parg(2)));
+	if (fd < 0) return sys_error("sys:open");
 	return make_integer(fd);
 }
 
-cell pp_sys_pipe(cell x) {
+cell pp_sys_pipe(void) {
 	int	fd[2];
 	cell	n;
 
-	if (pipe(fd) < 0)
-		return sys_error("sys:pipe", VOID);
+	if (pipe(fd) < 0) return sys_error("sys:pipe");
 	n = cons(make_integer(fd[1]), NIL);
 	save(n);
 	n = cons(make_integer(fd[0]), n);
@@ -542,16 +543,16 @@ cell pp_sys_pipe(cell x) {
 	return n;
 }
 
-cell pp_sys_read(cell x) {
+cell pp_sys_read(void) {
 	cell	buf, buf2;
 	int	r, k;
 	char	name[] = "sys:read";
 
-	k = integer_value(name, cadr(x));
+	k = integer_value(name, parg(2));
 	buf = make_string("", k);
-	r = read(integer_value(name, car(x)), string(buf), k);
+	r = read(integer_value(name, parg(1)), string(buf), k);
 	if (r < 0)
-		return sys_error("sys:read", x);
+		return sys_error("sys:read");
 	if (r < k) {
 		save(buf);
 		buf2 = make_string("", r);
@@ -562,14 +563,13 @@ cell pp_sys_read(cell x) {
 	return buf;
 }
 
-cell pp_sys_readdir(cell x) {
+cell pp_sys_readdir(void) {
 	DIR		*dir;
 	struct dirent	*dp;
 	cell		n, a, pa;
 
-	dir = opendir(string(car(x)));
-	if (dir == NULL)
-		return sys_error("sys:readdir", x);
+	dir = opendir(string(parg(1)));
+	if (dir == NULL) return sys_error("sys:readdir");
 	n = cons(NIL, NIL);
 	save(n);
 	a = n;
@@ -588,40 +588,37 @@ cell pp_sys_readdir(cell x) {
 		a = cdr(a);
 	}
 	cdr(pa) = NIL;
-	if (car(n) == NIL)
-		n = NIL;
+	if (car(n) == NIL) n = NIL;
 	closedir(dir);
 	unsave(1);
 	return n;
 }
 
-cell pp_sys_readlink(cell x) {
+cell pp_sys_readlink(void) {
 	char	buf[MAXPATHLEN+1];
 	int	k;
 
-	k = readlink(string(car(x)), buf, MAXPATHLEN);
-	if (k < 0)
-		return sys_error("sys:readlink", x);
+	k = readlink(string(parg(1)), buf, MAXPATHLEN);
+	if (k < 0) return sys_error("sys:readlink");
 	buf[k] = 0;
 	return make_string(buf, k);
 }
 
-cell pp_sys_rename(cell x) {
+cell pp_sys_rename(void) {
 	int	r;
 
-	r = rename(string(car(x)), string(cadr(x)));
-	if (r < 0)
-		return sys_error("sys:rename", x);
+	r = rename(string(parg(1)), string(parg(2)));
+	if (r < 0) return sys_error("sys:rename");
 	return sys_ok();
 }
 
-cell pp_sys_rmdir(cell x) {
-	if (rmdir(string(car(x))) < 0)
-		return sys_error("sys:rmdir", x);
+cell pp_sys_rmdir(void) {
+	if (rmdir(string(parg(1))) < 0)
+		return sys_error("sys:rmdir");
 	return sys_ok();
 }
 
-cell pp_sys_select(cell x) {
+cell pp_sys_select(void) {
 	cell		p;
 	struct timeval	tv, *tvp;
 	fd_set		rset, wset;
@@ -629,86 +626,84 @@ cell pp_sys_select(cell x) {
 	int		r, k, nfd;
 	char		msg[] = "sys:select: expected list of integer, got";
 
-	if (	car(x) != NIL &&
-		(!integer_p(caar(x)) ||
-		 cdar(x) == NIL ||
-		 !integer_p(cadar(x)) ||
-		 cddar(x) != NIL)
+	if (	parg(1) != NIL &&
+		(!integer_p(car(parg(1))) ||
+		 cdr(parg(1)) == NIL ||
+		 !integer_p(cadr(parg(1))) ||
+		 cddr(parg(1)) != NIL)
 	) {
-		error(msg, car(x));
+		error(msg, parg(1));
 	}
 	FD_ZERO(&rset);
 	nfd = 0;
-	for (p = cadr(x); p != NIL; p = cdr(p)) {
+	for (p = parg(2); p != NIL; p = cdr(p)) {
 		if (!pair_p(p))
-			error("sys:select: improper list", cadr(x));
+			error("sys:select: improper list", parg(2));
 		if (!integer_p(car(p)))
-			error(msg, cadr(x));
+			error(msg, parg(2));
 		k = integer_value(name, car(p));
 		FD_SET(k, &rset);
 		if (k > nfd) nfd = k;
 	}
 	FD_ZERO(&wset);
-	for (p = caddr(x); p != NIL; p = cdr(p)) {
+	for (p = parg(3); p != NIL; p = cdr(p)) {
 		if (!pair_p(p))
-			error("sys:select: improper list", caddr(x));
+			error("sys:select: improper list", parg(3));
 		if (!integer_p(car(p)))
-			error(msg, caddr(x));
+			error(msg, parg(3));
 		k = integer_value(name, car(p));
 		FD_SET(k, &wset);
 		if (k > nfd) nfd = k;
 	}
 	nfd++;
-	if (car(x) == NIL) {
+	if (parg(1) == NIL) {
 		tvp = NULL;
 	}
 	else {
-		tv.tv_sec = integer_value(name, caar(x));
-		tv.tv_usec = integer_value(name, cadar(x));
+		tv.tv_sec = integer_value(name, car(parg(1)));
+		tv.tv_usec = integer_value(name, cadr(parg(1)));
 		tvp = &tv;
 	}
 	r = select(nfd, &rset, &wset, NULL, tvp);
-	if (r < 0)
-		return sys_error(name, x);
+	if (r < 0) return sys_error(name);
 	return r==0? FALSE: make_integer(r);
 }
 
-cell pp_sys_setgid(cell x) {
-	if (setgid(integer_value("sys:setgid", car(x))) < 0)
-		return sys_error("sys:setgid", x);
+cell pp_sys_setgid(void) {
+	if (setgid(integer_value("sys:setgid", parg(1))) < 0)
+		return sys_error("sys:setgid");
 	return sys_ok();
 }
 
-cell pp_sys_setpgid(cell x) {
+cell pp_sys_setpgid(void) {
 	int	r;
 
-	r = setpgid(0, integer_value("sys:setpgid", car(x)));
-	if (r < 0)
-		return sys_error("sys:setpgid", x);
+	r = setpgid(0, integer_value("sys:setpgid", parg(1)));
+	if (r < 0) return sys_error("sys:setpgid");
 	return sys_ok();
 }
 
-cell pp_sys_setuid(cell x) {
-	if (setuid(integer_value("sys:setgid", car(x))) < 0)
-		return sys_error("sys:setuid", x);
+cell pp_sys_setuid(void) {
+	if (setuid(integer_value("sys:setgid", parg(1))) < 0)
+		return sys_error("sys:setuid");
 	return sys_ok();
 }
 
-cell pp_sys_sleep(cell x) {
-	if (sleep(integer_value("sys:sleep", car(x))))
-		return sys_error("sys:sleep", x);
+cell pp_sys_sleep(void) {
+	if (sleep(integer_value("sys:sleep", parg(1))))
+		return sys_error("sys:sleep");
 	return sys_ok();
 }
 
-cell sys_stat(int follow, cell x) {
+cell sys_stat(int follow) {
 	struct stat	sb;
 	cell		n, a;
 
-	if ((follow? stat: lstat)(string(car(x)), &sb) < 0)
-		return sys_error(NULL, VOID);
+	if ((follow? stat: lstat)(string(parg(1)), &sb) < 0)
+		return sys_error(NULL);
 	n = cons(NIL, NIL);
 	save(n);
-	assign(car(n), cons(symbol_ref("name"), car(x)));
+	assign(car(n), cons(symbol_ref("name"), parg(1)));
 	a = cons(NIL, NIL);
 	cdr(n) = a;
 	assign(car(a), cons(symbol_ref("size"), NIL));
@@ -753,96 +748,95 @@ cell sys_stat(int follow, cell x) {
 	return n;
 }
 
-cell pp_sys_stat(cell x) {
-	return sys_stat(1, x);
+cell pp_sys_stat(void) {
+	return sys_stat(1);
 }
 
-cell pp_sys_lstat(cell x) {
-	return sys_stat(0, x);
+cell pp_sys_lstat(void) {
+	return sys_stat(0);
 }
 
-int stat_mode(char *who, int follow, cell x) {
+int stat_mode(char *who, int follow) {
 	struct stat	st;
 
-	if ((follow? stat: lstat)(string(car(x)), &st) < 0)
-		return sys_error(who, x);
+	if ((follow? stat: lstat)(string(parg(1)), &st) < 0)
+		return sys_error(who);
 	return st.st_mode;
 }
 
-cell pp_sys_stat_block_dev_p(cell x) {
-	return S_ISBLK(stat_mode("stat-block-dev?", 1, x))? TRUE: FALSE;
+cell pp_sys_stat_block_dev_p(void) {
+	return S_ISBLK(stat_mode("stat-block-dev?", 1))? TRUE: FALSE;
 }
 
-cell pp_sys_stat_char_dev_p(cell x) {
-	return S_ISCHR(stat_mode("stat-char-dev?", 1, x))? TRUE: FALSE;
+cell pp_sys_stat_char_dev_p(void) {
+	return S_ISCHR(stat_mode("stat-char-dev?", 1))? TRUE: FALSE;
 }
 
-cell pp_sys_stat_directory_p(cell x) {
-	return S_ISDIR(stat_mode("stat-directory?", 1, x))? TRUE: FALSE;
+cell pp_sys_stat_directory_p(void) {
+	return S_ISDIR(stat_mode("stat-directory?", 1))? TRUE: FALSE;
 }
 
-cell pp_sys_stat_pipe_p(cell x) {
-	return S_ISFIFO(stat_mode("stat-pipe?", 1, x))? TRUE: FALSE;
+cell pp_sys_stat_pipe_p(void) {
+	return S_ISFIFO(stat_mode("stat-pipe?", 1))? TRUE: FALSE;
 }
 
-cell pp_sys_stat_regular_p(cell x) {
-	return S_ISREG(stat_mode("stat-regular?", 1, x))? TRUE: FALSE;
+cell pp_sys_stat_regular_p(void) {
+	return S_ISREG(stat_mode("stat-regular?", 1))? TRUE: FALSE;
 }
 
-cell pp_sys_stat_socket_p(cell x) {
-	return S_ISSOCK(stat_mode("stat-socket?", 1, x))? TRUE: FALSE;
+cell pp_sys_stat_socket_p(void) {
+	return S_ISSOCK(stat_mode("stat-socket?", 1))? TRUE: FALSE;
 }
 
-cell pp_sys_lstat_block_dev_p(cell x) {
-	return S_ISBLK(stat_mode("lstat-block-dev?", 0, x))? TRUE: FALSE;
+cell pp_sys_lstat_block_dev_p(void) {
+	return S_ISBLK(stat_mode("lstat-block-dev?", 0))? TRUE: FALSE;
 }
 
-cell pp_sys_lstat_char_dev_p(cell x) {
-	return S_ISCHR(stat_mode("lstat-char-dev?", 0, x))? TRUE: FALSE;
+cell pp_sys_lstat_char_dev_p(void) {
+	return S_ISCHR(stat_mode("lstat-char-dev?", 0))? TRUE: FALSE;
 }
 
-cell pp_sys_lstat_directory_p(cell x) {
-	return S_ISDIR(stat_mode("lstat-directory?", 0, x))? TRUE: FALSE;
+cell pp_sys_lstat_directory_p(void) {
+	return S_ISDIR(stat_mode("lstat-directory?", 0))? TRUE: FALSE;
 }
 
-cell pp_sys_lstat_pipe_p(cell x) {
-	return S_ISFIFO(stat_mode("lstat-pipe?", 0, x))? TRUE: FALSE;
+cell pp_sys_lstat_pipe_p(void) {
+	return S_ISFIFO(stat_mode("lstat-pipe?", 0))? TRUE: FALSE;
 }
 
-cell pp_sys_lstat_regular_p(cell x) {
-	return S_ISREG(stat_mode("lstat-regular?", 0, x))? TRUE: FALSE;
+cell pp_sys_lstat_regular_p(void) {
+	return S_ISREG(stat_mode("lstat-regular?", 0))? TRUE: FALSE;
 }
 
-cell pp_sys_lstat_socket_p(cell x) {
-	return S_ISSOCK(stat_mode("lstat-socket?", 0, x))? TRUE: FALSE;
+cell pp_sys_lstat_socket_p(void) {
+	return S_ISSOCK(stat_mode("lstat-socket?", 0))? TRUE: FALSE;
 }
 
-cell pp_sys_lstat_symlink_p(cell x) {
-	return S_ISLNK(stat_mode("lstat-symlink?", 0, x))? TRUE: FALSE;
+cell pp_sys_lstat_symlink_p(void) {
+	return S_ISLNK(stat_mode("lstat-symlink?", 0))? TRUE: FALSE;
 }
 
-cell pp_sys_strerror(cell x) {
-	char	*s = strerror(integer_value("sys:strerror", car(x)));
+cell pp_sys_strerror(void) {
+	char	*s = strerror(integer_value("sys:strerror", parg(1)));
 
 	return make_string(s, strlen(s));
 }
 
-cell pp_sys_symlink(cell x) {
-	if (symlink(string(car(x)), string(cadr(x))) < 0)
-		return sys_error("sys:symlink", x);
+cell pp_sys_symlink(void) {
+	if (symlink(string(parg(1)), string(parg(2))) < 0)
+		return sys_error("sys:symlink");
 	return sys_ok();
 }
 
-cell pp_sys_system(cell x) {
+cell pp_sys_system(void) {
 	int	r;
 
-	r = system(string(car(x)));
-	if (r < 0 || r > 127)
-		return sys_error("sys:system", x);
+	r = system(string(parg(1)));
+	if (r < 0 || r > 127) return sys_error("sys:system");
 	return make_integer(r);
 }
 
-cell pp_sys_gettimeofday(cell x) {
+cell pp_sys_gettimeofday(void) {
 	struct timeval	t;
 	cell		n, m;
 
@@ -856,55 +850,54 @@ cell pp_sys_gettimeofday(cell x) {
 	return n;
 }
 
-cell pp_sys_umask(cell x) {
+cell pp_sys_umask(void) {
 	int	r;
 
-	if (x == NIL)
+	if (0 == narg())
 		umask(r = umask(0));
 	else
-		r = umask(integer_value("sys:umask", car(x)));
+		r = umask(integer_value("sys:umask", parg(1)));
 	return make_integer(r);
 }
 
-cell pp_sys_unlink(cell x) {
-	if (unlink(string(car(x))) < 0)
-		return sys_error("sys:unlink", x);
+cell pp_sys_unlink(void) {
+	if (unlink(string(parg(1))) < 0)
+		return sys_error("sys:unlink");
 	return sys_ok();
 }
 
-cell pp_sys_unlock(cell x) {
+cell pp_sys_unlock(void) {
 	char	p[256], *s;
 
-	s = string(car(x));
+	s = string(parg(1));
 	if (strlen(s) > 248)
-		error("sys:unlock: path too long", car(x));
+		error("sys:unlock: path too long", parg(1));
 	sprintf(p, "%s.lock", s);
 	rmdir(p);
 	return sys_ok();
 }
 
-cell pp_sys_usleep(cell x) {
+cell pp_sys_usleep(void) {
 #if __FreeBSD__ == 7
 	int usleep(useconds_t microseconds);
 #endif
-	if (usleep(integer_value("sys:usleep", car(x))))
-		return sys_error("sys:usleep", x);
+	if (usleep(integer_value("sys:usleep", parg(1))))
+		return sys_error("sys:usleep");
 	return sys_ok();
 }
 
-cell pp_sys_utimes(cell x) {
-	if (utimes(string(car(x)), NULL) < 0)
-		return sys_error("sys:utimes", x);
+cell pp_sys_utimes(void) {
+	if (utimes(string(parg(1)), NULL) < 0)
+		return sys_error("sys:utimes");
 	return sys_ok();
 }
 
-cell pp_sys_wait(cell x) {
+cell pp_sys_wait(void) {
 	int	r, status;
 	cell	n;
 
 	r = wait(&status);
-	if (r < 0)
-		return sys_error("sys:wait", VOID);
+	if (r < 0) return sys_error("sys:wait");
 	n = cons(make_integer(r), NIL);
 	save(n);
 	n = cons(make_integer(WEXITSTATUS(status)), n);
@@ -912,38 +905,35 @@ cell pp_sys_wait(cell x) {
 	return n;
 }
 
-cell pp_sys_waitpid(cell x) {
+cell pp_sys_waitpid(void) {
 	int	r, status;
 	char	name[] = "sys:waitpid";
 
-	r = waitpid(integer_value(name, car(x)), &status, WNOHANG);
-	if (r < 0)
-		return sys_error(name, VOID);
+	r = waitpid(integer_value(name, parg(1)), &status, WNOHANG);
+	if (r < 0) return sys_error(name);
 	return r == 0? FALSE: make_integer(WEXITSTATUS(status));
 }
 
-cell pp_sys_write(cell x) {
+cell pp_sys_write(void) {
 	int	r;
 
-	r = write(integer_value("sys:write", car(x)), string(cadr(x)),
-		string_len(cadr(x))-1);
-	if (r < 0)
-		return sys_error("sys:write", x);
+	r = write(integer_value("sys:write", parg(1)), string(parg(2)),
+		string_len(parg(2))-1);
+	if (r < 0) return sys_error("sys:write");
 	return make_integer(r);
 }
 
 #ifdef NETWORK
 
-cell pp_sys_inet_accept(cell x) {
+cell pp_sys_inet_accept(void) {
 	int	r;
 
-	r = accept(integer_value("sys:inet-accept", car(x)), NULL, 0);
-	if (r < 0)
-		return sys_error("sys:inet-accept", x);
+	r = accept(integer_value("sys:inet-accept", parg(1)), NULL, 0);
+	if (r < 0) return sys_error("sys:inet-accept");
 	return make_integer(r);
 }
 
-cell pp_sys_inet_connect(cell x) {
+cell pp_sys_inet_connect(void) {
 	struct addrinfo	hints, *res, *rp;
 	int 		s;
 	int		r;
@@ -951,9 +941,9 @@ cell pp_sys_inet_connect(cell x) {
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	r = getaddrinfo(string(car(x)), string(cadr(x)), &hints, &res);
+	r = getaddrinfo(string(parg(1)), string(parg(1)), &hints, &res);
 	if (r != 0)
-		return sys_error("sys:inet-connect/getaddrinfo", x);
+		return sys_error("sys:inet-connect/getaddrinfo");
 	s = -1;
 	for (rp = res; s < 0 && rp; rp = rp->ai_next) {
 		s = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
@@ -966,22 +956,22 @@ cell pp_sys_inet_connect(cell x) {
 		}
 	}
 	if (s < 0)
-		return sys_error("sys:inet-connect", x);
+		return sys_error("sys:inet-connect");
 	freeaddrinfo(res);
 	return make_integer(s);
 }
 
-cell pp_sys_inet_getpeername(cell x) {
+cell pp_sys_inet_getpeername(void) {
 	socklen_t		len;
 	struct sockaddr_storage addr;
 	char			ip[128];
 	int			port, fd;
 	cell			n, m;
 
-	fd = integer_value("sys:inet-getpeername", car(x));
+	fd = integer_value("sys:inet-getpeername", parg(1));
 	len = sizeof addr;
 	if (getpeername(fd, (struct sockaddr *) &addr, &len) < 0)
-		return sys_error(NULL, VOID);
+		return sys_error(NULL);
 	if (addr.ss_family == AF_INET6) {
 		struct sockaddr_in6 *s = (struct sockaddr_in6 *) &addr;
 		port = ntohs(s->sin6_port);
@@ -1000,35 +990,35 @@ cell pp_sys_inet_getpeername(cell x) {
 	return n;
 }
 
-cell pp_sys_inet_listen(cell x) {
+cell pp_sys_inet_listen(void) {
 	struct addrinfo	hints, *res, *rp;
 	int		s;
 	int		r, maxq;
 	char		*host;
 	struct utsname	u;
 
-	maxq = integer_value("sys:inet-listen", caddr(x));
-	if (string_p(car(x))) {
-		host = string(car(x));
+	maxq = integer_value("sys:inet-listen", parg(3));
+	if (string_p(parg(1))) {
+		host = string(parg(1));
 	}
-	else if (car(x) == TRUE) {
+	else if (parg(1) == TRUE) {
 		r = uname(&u);
 		if (r < 0)
-			return sys_error("sys:inet-listen/uname", x);
+			return sys_error("sys:inet-listen/uname");
 		host = u.nodename;
 	}
 	else {
 		error("sys:inet-listen: expected string or #t, got",
-			car(x));
+			parg(1));
 		return UNDEFINED; /*LINT*/
 	}
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-	r = getaddrinfo(host, string(cadr(x)), &hints, &res);
+	r = getaddrinfo(host, string(parg(2)), &hints, &res);
 	if (r != 0)
-		return sys_error("sys:inet-listen/getaddrinfo", x);
+		return sys_error("sys:inet-listen/getaddrinfo");
 	s = -1;
 	for (rp = res; s < 0 && rp; rp = rp->ai_next) {
 		s = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
@@ -1042,7 +1032,7 @@ cell pp_sys_inet_listen(cell x) {
 		listen(s, maxq);
 	}
 	if (s < 0)
-		return sys_error("sys:inet-listen", x);
+		return sys_error("sys:inet-listen");
 	freeaddrinfo(res);
 	return make_integer(s);
 }

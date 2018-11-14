@@ -1,6 +1,6 @@
 ; Scheme 9 from Empty Space, Function Library
-; By Nils M Holm, 2010-2015
-; Placed in the Public Domain
+; By Nils M Holm, 2010-2018
+; In the public domain
 ;
 ; (c2html <option> ...)  ==>  string | unspecific
 ;
@@ -65,6 +65,7 @@
 (load-from-library "hof.scm")
 (load-from-library "htmlify-char.scm")
 (load-from-library "loutify-char.scm")
+(load-from-library "troffify-char.scm")
 (load-from-library "string-expand.scm")
 
 (define (c2html . options)
@@ -79,9 +80,9 @@
   (define RP #\))
 
   (define (Prolog)
-    (let ((p  (if lout-mode
-                  '("@Pre{")
-                  '("<PRE class=ccode>"))))
+    (let ((p  (cond (lout-mode  '("@Pre{"))
+                    (troff-mode '(".CB"))
+                    (else       '("<PRE class=ccode>")))))
       (if full-html
           (append
            '("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\""
@@ -97,9 +98,9 @@
 
   (define (Epilog)
     (change-color #f #f #f)
-    (let ((p (if lout-mode
-                 '("}")
-                 '("</PRE>"))))
+    (let ((p (cond (lout-mode  '("}"))
+                   (troff-mode '(".CE"))
+                   (else       '("</PRE>")))))
       (if full-html
           (append p '("</BODY>" "</HTML>"))
           p)))
@@ -151,36 +152,43 @@
   (define Bold #f)
 
   (define (escaped-output s)
-    (if lout-mode
-        (output (apply string-append
-                       (map loutify-char
-                            (string->list s))))
-        (output (htmlify-string s))))
+    (cond (lout-mode
+            (output (apply string-append
+                           (map loutify-char
+                                (string->list s)))))
+          (troff-mode
+            (output (apply string-append
+                           (map troffify-char
+                                (string->list s)))))
+          (else
+            (output (htmlify-string s)))))
 
   (define (change-color quoted co bo)
     (cond (quoted)
           ((and (equal? co Color) (eq? bo Bold)))
           (else
             (if Bold
-                (if lout-mode
-                    (output "}")
-                    (output "</B>")))
+                (cond (lout-mode  (output "}"))
+                      (troff-mode)
+                      (else       (output "</B>"))))
             (if Color
-                (if lout-mode
-                    (output "}")
-                    (output "</SPAN>")))
+                (cond (lout-mode  (output "}"))
+                      (troff-mode)
+                      (else       (output "</SPAN>"))))
             (if co
-                (if lout-mode
-                    (begin (output "@C_")
-                           (output co)
-                           (output "{"))
-                    (begin (output "<SPAN class=")
-                           (output co)
-                           (output ">"))))
+                (cond (lout-mode
+                        (output "@C_")
+                        (output co)
+                        (output "{"))
+                      (troff-mode)
+                      (else
+                        (output "<SPAN class=")
+                        (output co)
+                        (output ">"))))
             (if bo
-                (if lout-mode
-                    (output "@B{")
-                    (output "<B>")))
+                (cond (lout-mode  (output "@B{"))
+                      (troff-mode)
+                      (else (output "<B>"))))
             (set! Color co)
             (set! Bold bo))))
 
@@ -262,6 +270,7 @@
     (let* ((s  (collect-string c '() #\" #t))
            (s2 (substring s 1 (- (string-length s) 1))))
       (if (and (not lout-mode)
+               (not troff-mode)
                (= *local-include* 1))
           (with-color #f
                       Color-constant
@@ -322,6 +331,12 @@
                           (lambda () (escaped-output (cdr c/s))))))
       (car c/s)))
 
+  (define (times n x)
+    (let loop ((n n))
+      (cond ((positive? n)
+              (output x)
+              (loop (- n 1))))))
+
   (define (skip-spaces c)
     (let loop ((c c)
                (n 0))
@@ -334,11 +349,11 @@
                          (output (number->string n))
                          (output "s}")))
               c)
+            (troff-mode
+              (times n " ")
+              c)
             (else
-              (let loop ((n n))
-                (cond ((positive? n)
-                        (output #\space)
-                        (loop (- n 1)))))
+              (times n #\space)
               c))))
 
   (define (collect-comment)
@@ -428,35 +443,43 @@
 
   (define full-html    #f)
   (define lout-mode    #f)
+  (define troff-mode   #f)
   (define input-string #f)
 
   (accept-keywords "c2html"
                    options
                    '(full-html: input-string: initial-style: lout-mode:
-                     terminate:))
+                     troff-mode: terminate:))
   (let ((fh (keyword-value options 'full-html: #f))
         (lm (keyword-value options 'lout-mode: #f))
+        (tm (keyword-value options 'troff-mode: #f))
         (is (keyword-value options 'input-string: #f))
         (st (keyword-value options 'initial-style: '(#f #f)))
         (te (keyword-value options 'terminate: #f)))
     (set! full-html fh)
     (set! lout-mode lm)
+    (set! troff-mode tm)
     (set! input-string is)
     (set! Color (car st))
     (set! Bold  (cadr st))
-    (if (and lout-mode full-html)
-        (error "Lout mode cannot be combined with HTML mode"))
+    (if (or (and lout-mode full-html)
+            (and lout-mode troff-mode)
+            (and troff-mode full-html))
+        (error "Pick either Lout, TROFF, or HTML mode"))
     (cond (te
-            (if lout-mode
-                ""
-                (string-append (if (cadr te) "</B>" "")
-                               (if (car te) "</SPAN>" ""))))
+            (cond (lout-mode
+                    "")
+                  (troff-mode
+                    "")
+                  (else
+                    (string-append (if (cadr te) "</B>" "")
+                                   (if (car te) "</SPAN>" "")))))
           (input-string
             (set! *input-string* (append (string->list
                                            (string-expand input-string))
                                          (list #\newline)))
             (set! *output-string* '())
-            (if lout-mode
+            (if (or lout-mode troff-mode)
                 (let ((c Color)
                       (b Bold))
                   (set! Color #f)
@@ -466,12 +489,17 @@
                 (collect-comment))
             (print-program (next-char))
             (let* ((out (output-string))
-                   (out (if lout-mode
-                            (string-append
-                              out
-                              (if Bold "}" "")
-                              (if Color "}" ""))
-                            out)))
+                   (out (cond (lout-mode
+                                (string-append
+                                  out
+                                  (if Bold "}" "")
+                                  (if Color "}" "")))
+                              (troff-mode
+                                (string-append
+                                  out
+                                  (if Bold "\\fP" "")))
+                              (else
+                                out))))
               (list (list Color Bold) out)))
           (else
             (output* (Prolog))

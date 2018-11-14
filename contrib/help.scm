@@ -1,6 +1,6 @@
 ; Scheme 9 from Empty Space, Function Library
-; By Nils M Holm, 2009-2015
-; Placed in the Public Domain
+; By Nils M Holm, 2009-2018
+; In the public domain
 ;
 ; (help)                     ==>  unspecific
 ; (help symbol | string)     ==>  unspecific
@@ -35,106 +35,72 @@
 ;                    (symbol? '())           ==>  #f
 ;                    (symbol? #f)            ==>  #f
 
-(load-from-library "name-to-file-name.scm")
+(load-from-library "make-help-index.scm")
+(load-from-library "find-help-page.scm")
 (load-from-library "read-line.scm")
 (load-from-library "string-find.scm")
-(load-from-library "remove.scm")
 (load-from-library "mergesort.scm")
+(load-from-library "flatten.scm")
+(load-from-library "list-to-set.scm")
+(load-from-library "filter.scm")
 
 (define *lines-per-page* (if (eq? *host-system* 'plan9) #f 23))
 
-(define help
-  (let ((name->file-name name->file-name))
-    (lambda sym
+(define (help . sym)
 
-      (define (more? tty)
-        (display "; ----- more (q = quit) -----")
-        (let ((s (read-line tty)))
-          (if (eof-object? s)
-              (begin (newline)
-                     #t)
-              (not (string-find "q" s)))))
+  (define (more? tty)
+    (display "; ----- more (q = quit) -----")
+    (let ((s (read-line tty)))
+      (if (eof-object? s)
+          (begin (newline)
+                 #t)
+          (not (string-find "q" s)))))
 
-      (define (show-file file)
-        (read-line)
-        (newline)
-        (let ((tty (current-input-port)))
-          (with-input-from-file file
-            (lambda ()
-              (let print ((line (read-line))
-                          (lno  1))
-                (cond ((eof-object? line)
-                        (newline))
-                      ((and *lines-per-page*
-                            (= lno *lines-per-page*))
-                        (if (more? tty)
-                            (print line 0)
-                            (void)))
-                      (else
-                        (display line)
-                        (newline)
-                        (print (read-line) (+ 1 lno)))))))))
+  (define (show-file file)
+    (read-line)
+    (newline)
+    (let ((tty (current-input-port)))
+      (with-input-from-file file
+        (lambda ()
+          (let print ((line (read-line))
+                      (lno  1))
+            (cond ((eof-object? line)
+                    (newline))
+                  ((and *lines-per-page*
+                        (= lno *lines-per-page*))
+                    (if (more? tty)
+                        (print line 0)
+                        (void)))
+                  (else
+                    (display line)
+                    (newline)
+                    (print (read-line) (+ 1 lno)))))))))
 
-      (let* ((name (cond ((null? sym)
-                           "help")
-                         ((symbol? (car sym))
-                           (symbol->string (car sym)))
-                         ((string? (car sym))
-                           (car sym))
-                         (else
-                           (error "help: expected string or symbol, got"
-                                  (car sym)))))
-             (name (name->file-name name)))
-        (cond ((locate-file (string-append "help/" name))
-                => show-file)
-              (else
-                (let loop ((e (map symbol->string *extensions*)))
-                  (if (null? e)
-                      (error "help: could not find help page" name)
-                      (cond ((locate-file
-                               (string-append "help/" (car e) "/" name))
-                              => show-file)
-                            (else (loop (cdr e))))))))))))
+  (let* ((name (cond ((null? sym)
+                      "help")
+                    ((symbol? (car sym))
+                      (symbol->string (car sym)))
+                    ((string? (car sym))
+                      (car sym))
+                    (else
+                      (error "help: expected string or symbol, got"
+                             (car sym)))))
+        (path (find-help-page name)))
+    (if path
+        (show-file path)
+        (error "help: no such help page" name))))
 
-(define (help-file-exists? name s)
-  (let loop ((exts (cons "." (map symbol->string *extensions*))))
-    (cond ((null? exts)
-            #f)
-          ((and (string-find name s)
-                (locate-file
-                  (string-append
-                    "help/"
-                    (car exts)
-                    "/"
-                    (name->file-name s))))
-            #t)
-          (else
-            (loop (cdr exts))))))
-
-(define apropos
-  (let ((name->file-name   name->file-name)
-        (help-file-exists? help-file-exists?))
-    (lambda sym
-      (let* ((name (cond ((null? sym)
-                           "")
-                         ((symbol? (car sym))
-                           (symbol->string (car sym)))
-                         ((string? (car sym))
-                           (car sym))
-                         (else
-                           (error "apropos: expected string or symbol, got"
-                                  (car sym))))))
-        (mergesort
-          (lambda (a b)
-            (string<=? (symbol->string a)
-                       (symbol->string b)))
-          (remp null?
-                (map (lambda (x)
-                       (let ((s (symbol->string x)))
-                         (if (help-file-exists? name s)
-                             x
-                             '())))
-                     (let ((index (locate-file "help/INDEX")))
-                       (if index
-                           (with-input-from-file index read)
-                           (error "help index not found"))))))))))
+(define (apropos . sym)
+  (let* ((name (cond ((null? sym)
+                       "")
+                     ((symbol? (car sym))
+                       (symbol->string (car sym)))
+                     ((string? (car sym))
+                       (car sym))
+                     (else
+                       (error "apropos: expected string or symbol, got"
+                              (car sym))))))
+    (filter
+      (lambda (x)
+        (string-find name (symbol->string x)))
+      (make-help-index))))

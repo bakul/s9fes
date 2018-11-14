@@ -3,7 +3,7 @@ S9fES  (macro-expand object)    ==>  object
 
 If OBJECT contains any form that applies a macro, replace that form by
 its expanded form, else return OBJECT unaltered. MACRO-EXPAND expands
-all macro applications in the given object, recursively. MACRO-EXPAND-1
+all macro applications in the given object recursively. MACRO-EXPAND-1
 expands only the first appearance of a macro application and then stops.
 
 (define-syntax (while p . body)

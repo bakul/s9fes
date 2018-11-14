@@ -1,0 +1,11 @@
+S9 LIB  (troffify-char char)      ==>  string
+        (troffify-string string)  ==>  string
+
+TROFFIFY-CHAR converts a char to a string that is save for
+inclusion in a TROFF document. TROFFIFY-STRING does the
+same for a string.
+
+Note: the conversion "$" -> "$dollar$" is a local idiosyncrasy.
+
+(troffify-char #\$)           ==>  "$dollar$"
+(troffify-string "\"a\\b\"")  ==>  "\"a\\\\b\""

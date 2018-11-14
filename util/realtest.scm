@@ -809,8 +809,8 @@
 (test (expt 0 0) 1)
 (test (expt 0 1) 0)
 (test (expt 0 0.1) 0)
-(test (number? (expt 0 0.0)) #f)
-(test (number? (expt 0 -0.1)) #f)
+(test (number? (catch-errors 'nope (expt 0 0.0))) #f)
+(test (number? (catch-errors 'nope (expt 0 -0.1))) #f)
 
 (test (expt  1 -1) 1.0)
 (test (expt  2 -1) 0.5)
@@ -901,6 +901,7 @@
 (test (< -2.3025850930 (log 0.1) -2.3025850920) #t)
 (test (<  0.6931471800 (log 2.0)  0.6931471809) #t)
 (test (<  1.0986122880 (log 3.0)  1.0986122889) #t)
+(test (catch-errors 'boom (log 0)) 'boom)
 
 (test (min 2 1 -2 -1 3) -2)
 (test (exact? (min 2 1 -2 -1 3)) #t)

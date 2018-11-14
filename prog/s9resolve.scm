@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; s9resolve -- resolve S9fES library dependencies
 ; By Nils M Holm, 2010

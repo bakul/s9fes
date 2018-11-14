@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; scm2html -- print Scheme code to HTML
 ; By Nils M Holm, 2009,2010

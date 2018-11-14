@@ -506,7 +506,8 @@
           (if (inexact? y)
               (if (positive? y)
                   0
-                  (/ 1 0))
+                  (error "expt: range error"
+                         (cons x (cons y '()))))
               (expt2 x y)))
         ((integer? y)
           (expt2 x y))
@@ -553,7 +554,7 @@
     (let ((x (/ (- x 1) (+ x 1))))
       (l-series6 x y x r last lim)))
   (cond ((not (positive? x))
-          (/ 0))
+          (error "log: range error" x))
         ((< 0.1 x 5)
           (l-series x 1 0.0 1.0 #f))
         (else
@@ -1121,12 +1122,22 @@
           (apply print (cdr xs)))))
 
 (define (locate-file file)
-  (let loop ((paths *library-path*))
-    (and (not (null? paths))
-         (let ((full-path (string-append (car paths) "/" file)))
-           (if (file-exists? full-path)
-               full-path
-               (loop (cdr paths)))))))
+  (let* ((home      (environment-variable "HOME"))
+         (home-path (lambda (s)
+                      (if (not home)
+                          (error "locate-file: cannot locate home directory")
+                          (string-append
+                            home
+                            (substring s 1 (string-length s)))))))
+    (let loop ((paths *library-path*))
+      (and (not (null? paths))
+           (let* ((full-path (string-append (car paths) "/" file))
+                  (full-path (if (char=? #\~ (string-ref full-path 0))
+                                 (home-path full-path)
+                                 full-path)))
+             (if (file-exists? full-path)
+                 full-path
+                 (loop (cdr paths))))))))
 
 (define load-from-library 
   (let ((locate-file locate-file))

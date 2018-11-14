@@ -1,7 +1,7 @@
 S9fES  (require-extension <extension> ...)  ==>  unspecific
 
 When the given <extension>s have been compiled into the interpreter
-running this form, the form evaluates to an unspecific value. When
+expanding this form, the form evaluates to an unspecific value. When
 at least one of the given <extension>s is absent, an error is
 signalled.
 

@@ -1,4 +1,4 @@
 S9fES  (file-exists? string)  ==>  boolean
 
-Return #T if the file specifed in the STRING argument exists and
-otherwise return #F.
+Return #T if the file specifed in the STRING argument exists
+(and is readable by the Scheme process) and otherwise return #F.

@@ -46,3 +46,6 @@ Examples:
         (cond ((null? a) 0)
               ((pair? a) (+ 1 (loop (cdr a))))
               (else (throw improper #f)))))))
+
+(list-length '(1 2 3))    ==>  3
+(list-length '(1 2 . 3))  ==>  #f

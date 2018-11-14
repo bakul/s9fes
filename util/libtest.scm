@@ -1007,6 +1007,12 @@
     ==>  ("foobar" "barbaz")
 )
 
+(load-from-library "troffify-char.scm")
+(%test
+  (troffify-char #\$)           ==>  "$dollar$"
+  (troffify-string "\"a\\b\"")  ==>  "\"a\\\\b\""
+)
+
 (load-from-library "type-case.scm")
 (%test
   (type-of type-of)  ==>  procedure

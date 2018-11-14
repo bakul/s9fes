@@ -2,7 +2,7 @@
 	================================================================
 	|                           S9CORE                             |
 	|         A Toolkit for Implementing Dynamic Languages         |
-	|                           Mk IV                              |
+	|                           Mk IVc                             |
 	================================================================
 
 	                     Nils M Holm, 2007-2018
@@ -10,7 +10,6 @@
 
 	 If your country does not have a public domain, the CC0 applies:
 	 https://creativecommons.org/share-your-work/public-domain/cc0/
-
 
 	----------------------------------------------------------------
 	RATIONALE
@@ -579,6 +578,21 @@
 	make_char('x')
 	................................................................
 
+	     Type: T_FIXNUM
+	Allocator: mkfix(int c)
+	Predicate: fix_p(x)
+	 Accessor: int fixval(x)
+
+	T_FIXNUM objects store C int's. The mkfix() function expects
+	the value to store, and fixval() retrieves the value. Fixnums
+	are only used to store integer values in S9core data structures.
+	S9core does not define any operations on fixnums.
+
+	Example:
+
+	mkfix(123)
+	................................................................
+
 	     Type: T_INPUT_PORT
 	Allocator: make_port(int portno, T_INPUT_PORT)
 	Predicate: input_port_p(x)
@@ -597,21 +611,44 @@
 
 	     Type: T_INTEGER
 	Allocator: make_integer(cell segment)
+		   int_to_bignum(int x)
 	Predicate: integer_p(x)
-	 Accessor: cell bignum_to_int(x)
+		   small_int_p(x)
+	 Accessor: cell bignum_to_int(cell x, int *of)
+		   small_int_value(x)
 
 	The make_integer() function creates a single-segment bignum
 	integer in the range from
 
 	-10^S9_DITIGS_PER_CELL + 1  to  10^S9_DITIGS_PER_CELL - 1
 
-	To create larger bignum integers, the string_to_bignum()
+	The int_to_bignum() function creates a bignum integer with
+	any integer value. It is not as efficient as make_integer(),
+	but covers the whole range of C int's.
+
+	To create even larger bignum integers, the string_to_bignum()
 	function has to be used.
 
-	The bignum_to_int() accessor returns the value of a
-	single-segment bignum integer or UNDEFINED, if the bignum
-	has more than a single segment. There is no way to convert
-	multi-segment bignums to a native C type.
+	The bignum_to_int() accessor returns the value of a bignum
+	integer X, if the bignum is in the range from INT_MIN to
+	INT_MAX. There is no way to convert bignums outside of this
+	range to a native C type.
+
+	The integer pointed to by "of" serves as an overflow indicator.
+	When it is set to 0 when bignum_to_int() returns, the function
+	returned a valid int. When it is set to 1, the conversion
+	failed and the result must be discarded.
+
+	The small_int_p() predicate returns 1, if its argument is a
+	single-segment integer as created by make_integer(). The value
+	of such an integer can be extracted more efficiently by using
+	the small_int_value() accessor.
+
+	****************************************************************
+	Neither bignum_to_int() nor int_to_bignum() work in 64-bit mode,
+	because integer segments are too long there. Both will fail with
+	a fatal error in 64-bit mode.
+	****************************************************************
 
 	Example:
 

@@ -3,11 +3,14 @@
 ; Placed in the Public Domain
 ;
 ; (draw-tree object)  ==>  unspecific
+; (dt)                ==>  unspecific
 ;
 ; Print a tree structure resembling a Scheme datum. Each cons
 ; cell is represented by [o|o] with lines leading to their car
 ; and cdr parts. Conses with a cdr value of () are represented
 ; by [o|/].
+;
+; DT is an abbrevation for DRAW-TREE.
 ;
 ; (Example): (draw-tree '((a) (b . c) (d e)))  ==>  unspecific
 ;

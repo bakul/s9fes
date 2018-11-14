@@ -44,7 +44,6 @@ format() {
 if [ ! -d help-new ]; then
 	mkdir help-new
 	mkdir help-new/sys-unix
-	mkdir help-new/sys-plan9
 	mkdir help-new/curses
 	mkdir help-new/csv
 fi
@@ -57,7 +56,7 @@ for file in lib/*.scm contrib/*.scm; do
 	echo $file
 done
 
-for ext in sys-unix sys-plan9 curses csv; do
+for ext in sys-unix curses csv; do
 	for file in ext/$ext/*.scm; do
 		format $file >help-new/$ext/$(basename $file .scm)
 		echo $file
@@ -76,7 +75,6 @@ rm -f	csv/csv		\
 	set-tools	\
 	string-tools	\
 	syntax-rules	\
-	sys-plan9/plan9	\
 	sys-unix/unix	\
 	unix-tools	\
 	vector-tools

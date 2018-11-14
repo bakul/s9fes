@@ -6,8 +6,8 @@
  * https://creativecommons.org/share-your-work/public-domain/cc0/
  */
 
-#define RELEASE_DATE	"2018-10-29"
-#define PATCHLEVEL	0
+#define RELEASE_DATE	"2018-11-13"
+#define PATCHLEVEL	1
 
 #include "s9core.h"
 #include "s9import.h"
@@ -274,8 +274,7 @@ enum	{ OP_APPLIS, OP_APPLY, OP_ARG, OP_COPY_ARG, OP_CLOSURE,
 #define RBRACK	(USER_SPECIALS-2)
 #define DOT	(USER_SPECIALS-3)
 
-#define T_FIXNUM	(USER_SPECIALS-100)
-#define T_CATCH_TAG	(USER_SPECIALS-101)
+#define T_CATCH_TAG	(USER_SPECIALS-100)
 
 /*
  * Extension setup, add your own ones here
@@ -353,18 +352,6 @@ void expect(char *who, char *what, cell got) {
 /*
  * Type implementations
  */
-
-cell mkfix(int v) {
-	cell	n;
-
-	n = new_atom(v, NIL);
-	return new_atom(T_FIXNUM, n);
-}
-
-#define fix_p(n) \
-        (!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && T_FIXNUM == car(n))
-
-#define fixval(x) cadr(x)
 
 cell closure(cell i, cell e) {
 	cell	c;
@@ -924,7 +911,7 @@ void add_primitives(char *name, S9_PRIM *p) {
 	Glob = nconc(Glob, b);
 }
 
-cell eval(cell x);
+cell eval(cell x, int r);
 
 void init_extensions(void) {
 	cell	n, p;
@@ -940,13 +927,13 @@ void init_extensions(void) {
 		p = assq(p, Glob);
 		if (FALSE == p) continue;
 		p = cons(cadr(p), NIL);
-		eval(p);
+		eval(p, 1);
 	}
 	p = symbol_ref("s9:s9");
 	p = assq(p, Glob);
 	if (FALSE == p) return;
 	p = cons(cadr(p), NIL);
-	eval(p);
+	eval(p, 1);
 }
 
 void init_rts(void) {
@@ -2181,7 +2168,7 @@ cell free_vars(cell x, cell e) {
 		x = cdr(x);
 	}
 	n = unsave(1);
-	if (lam) e = unsave(3);
+	if (lam) unsave(3);
 	return n;
 }
 
@@ -3001,7 +2988,24 @@ void complsubr0(cell x, int op) {
 		}
 	}
 	else if (NIL == cddr(x)) {
+		/*
+		 * should catch wrong type
+		 */
 		compexpr(cadr(x), 0);
+	}
+	else if (OP_STRING_APPEND == op || OP_VECTOR_APPEND == op) {
+		x = cdr(x);
+		x = reverse(x);
+		save(x);
+		emitq(NIL);
+		while (x != NIL) {
+			emitop(OP_PUSH);
+			compexpr(car(x), 0);
+			emitop(OP_CONS);
+			x = cdr(x);
+		}
+		unsave(1);
+		emitop(op);
 	}
 	else {
 		x = cdr(x);
@@ -3283,7 +3287,7 @@ cell expand(cell x, int all) {
 		n = cons(n, NIL);
 		n = cons(cdr(m), n);
 		n = cons(S_apply, n);
-		n = eval(n);
+		n = eval(n, 1);
 		if (all) {
 			save(n);
 			n = expand(n, all);
@@ -3349,20 +3353,22 @@ void push(cell x) {
 /* Opcodes */
 
 cell apply_extproc(cell pfn) {
-	cell	a, x;
+	cell	x, a;
 	int	i, k;
 	char	*s;
 
-	save(a = NIL);
 	k = fixval(stackref(Sp));
-	for (i = k; i > 0; i--) {
-		a = cons(car(stackref(Sp-i)), a);
-		car(Stack) = a;
+	s = typecheck(pfn);
+	if (s != NULL) {
+		save(a = NIL);
+		for (i = k; i > 0; i--) {
+			a = cons(car(stackref(Sp-i)), a);
+			car(Stack) = a;
+		}
+		unsave(1);
+		error(s, a);
 	}
-	s = typecheck(pfn, a);
-	if (s != NULL) error(s, a);
-	x = apply_prim(pfn, a);
-	unsave(1);
+	x = apply_prim(pfn);
 	Sp -= k+1;
 	return x;
 }
@@ -3513,12 +3519,12 @@ cell integer_value(char *who, cell x) {
 		error(msg, x);
 		return 0;
 	}
-	if (cddr(x) != NIL) {
+	if (!small_int_p(x)) {
 		sprintf(msg, "%s: integer argument too big", who);
 		error(msg, x);
 		return 0;
 	}
-	return cadr(x);
+	return small_int_value(x);
 }
 
 cell integer_argument(char *who, cell x) {
@@ -3583,6 +3589,7 @@ cell append(cell a, cell b) {
 	if (NIL == a) return b;
 	if (NIL == b) return a;
 	save(n = cons(NIL, NIL));
+	pn = n; /*LINT*/
 	for (p = a; pair_p(p); p = cdr(p)) {
 		car(n) = car(p);
 		pn = n;
@@ -3745,6 +3752,7 @@ cell mul(cell x, cell y) {
 cell xdiv(cell x, cell y) {
 	if (!number_p(x)) expect("/", "number", x);
 	if (!number_p(y)) expect("/", "number", y);
+	if (real_zero_p(x)) error("/: divide by zero", UNDEFINED);
 	return real_divide(y, x);
 }
 
@@ -4027,17 +4035,25 @@ void sfill(cell a, cell n) {
 	for (i=0; i<k; i++) s[i] = c;
 }
 
-cell sconc(cell a, cell b) {
-	cell	n;
-	int	ka, kb;
+cell sconc(cell x) {
+	cell	p, n;
+	int	k, m;
+	char	*s;
 
-	if (!string_p(a)) expect("string-append", "string", a);
-	if (!string_p(b)) expect("string-append", "string", b);
-	ka = string_len(a)-1;
-	kb = string_len(b)-1;
-	n = make_string("", ka+kb);
-	memcpy(string(n), string(a), ka);
-	memcpy(&string(n)[ka], string(b), kb+1);
+	k = 0;
+	for (p = x; p != NIL; p = cdr(p)) {
+		if (!string_p(car(p)))
+			expect("string-append", "string", car(p));
+		k += string_len(car(p))-1;
+	}
+	n = make_string("", k);
+	s = string(n);
+	k = 0;
+	for (p = x; p != NIL; p = cdr(p)) {
+		m = string_len(car(p));
+		memcpy(&s[k], string(car(p)), m);
+		k += string_len(car(p))-1;
+	}
 	return n;
 }
 
@@ -4059,24 +4075,30 @@ cell vref(cell s, cell n) {
 	if (!vector_p(s)) expect("vector-ref", "vector", s);
 	i = integer_value("vector-ref", n);
 	if (i < 0 || i >= vector_len(s))
-		error("vextor-ref: index out of range", n);
+		error("vector-ref: index out of range", n);
 	return vector(s)[i];
 }
 
-cell vconc(cell a, cell b) {
-	cell	n, *va, *vb, *vn;
-	int	ka, kb, i;
+cell vconc(cell x) {
+	cell	n, p, *ov, *nv;
+	int	i, j, k, total;
 
-	if (!vector_p(a)) expect("vector-append", "vector", a);
-	if (!vector_p(b)) expect("vector-append", "vector", b);
-	ka = vector_len(a);
-	kb = vector_len(b);
-	n = make_vector(ka+kb);
-	va = vector(a);
-	vb = vector(b);
-	vn = vector(n);
-	for (i=0; i<ka; i++) vn[i] = va[i];
-	for (i=0; i<kb; i++) vn[i+ka] = vb[i];
+	total = 0;
+	for (p = x; p != NIL; p = cdr(p)) {
+		if (vector_p(car(p)))
+			total += vector_len(car(p));
+		else
+			expect("vector-append", "vector", car(p));
+	}
+	n = new_vec(T_VECTOR, total * sizeof(cell));;
+	nv = vector(n);
+	j = 0;
+	for (p = x; p != NIL; p = cdr(p)) {
+		ov = vector(car(p));
+		k = vector_len(car(p));
+		for (i = 0; i < k; i++)
+			nv[j++] = ov[i];
+	}
 	return n;
 }
 
@@ -4158,7 +4180,7 @@ cell readchar(cell p, int rej) {
 	return make_char(c);
 }
 
-cell read_obj(cell p, int rej) {
+cell read_obj(cell p) {
 	int	pp;
 	cell	n;
 
@@ -4208,6 +4230,9 @@ void dump_image_file(cell s) {
 	setbind(S_image_file, s);
 }
 
+void begin_rec(void);
+void end_rec(void);
+
 void loadfile(char *s) {
 	int	ldport, rdport;
 	cell	x, ld;
@@ -4226,13 +4251,15 @@ void loadfile(char *s) {
 	save(make_string(Srcfile, strlen(Srcfile)));
 	strncpy(Srcfile, s, TOKEN_LENGTH);
 	Srcfile[TOKEN_LENGTH] = 0;
+	begin_rec();
 	for (;;) {
 		set_input_port(ldport);
 		x = xread();
 		set_input_port(rdport);
 		if (END_OF_FILE == x) break;
-		eval(x);
+		eval(x, 0);
 	}
+	end_rec();
 	strcpy(Srcfile, string(unsave(1)));
 	Line_no = oline;
 	setbind(S_loading, ld);
@@ -4255,7 +4282,7 @@ cell stats(cell x) {
 
 	gcv();
 	Stats = 1;
-	x = eval(x);
+	x = eval(x, 1);
 	Stats = 0;
 	save(x);
 	get_counters(&ncs, &ccs, &vcs, &gcs);
@@ -4670,7 +4697,7 @@ void run(cell x) {
 		skip(1);
 		break;
 	case OP_EVAL:
-		Acc = eval(Acc);
+		Acc = eval(Acc, 1);
 		skip(1);
 		break;
 	case OP_EVEN_P:
@@ -4830,7 +4857,7 @@ void run(cell x) {
 		break;
 	case OP_READ:
 		if (!input_port_p(Acc)) expect("read", "input port", Acc);
-		Acc = read_obj(port_no(Acc), 0);
+		Acc = read_obj(port_no(Acc));
 		skip(1);
 		break;
 	case OP_READ_CHAR:
@@ -4849,6 +4876,7 @@ void run(cell x) {
 		break;
 	case OP_REVERSE_B:
 		if (!list_p(Acc)) expect("reverse!", "list", Acc);
+		if (constant_p(Acc)) error("reverse!: immutable", Acc);
 		Acc = nreverse(Acc);
 		skip(1);
 		break;
@@ -4883,13 +4911,11 @@ void run(cell x) {
 		skip(1);
 		break;
 	case OP_STRING_APPEND:
-		Acc = sconc(Acc, arg(0));
-		clear(1);
+		Acc = sconc(Acc);
 		skip(1);
 		break;
 	case OP_VECTOR_APPEND:
-		Acc = vconc(Acc, arg(0));
-		clear(1);
+		Acc = vconc(Acc);
 		skip(1);
 		break;
 	case OP_SET_INPUT_PORT_B:
@@ -5350,9 +5376,9 @@ void end_rec(void) {
 	Prog = unsave(1);
 }
 
-cell eval(cell x) {
+cell eval(cell x, int r) {
 	Tmp = x;
-	begin_rec();
+	if (r) begin_rec();
 	save(x);
 	Tmp = NIL;
 	x = expand(x, 1);
@@ -5364,7 +5390,7 @@ cell eval(cell x) {
 	car(Stack) = x;
 	x = interpret(x);
 	unsave(1);
-	end_rec();
+	if (r) end_rec();
 	return x;
 }
 
@@ -5436,7 +5462,7 @@ void repl(void) {
 		Intr = 0;
 		x = xread();
 		if (END_OF_FILE == x && 0 == Intr) break;
-		x = eval(x);
+		x = eval(x, 1);
 		if (x != UNSPECIFIC) {
 			setbind(S_starstar, x);
 			print_form(x);
@@ -5456,7 +5482,7 @@ void evalstr(char *s, int echo) {
 	clear_trace();
 	x = xsread(s);
 	if (UNDEFINED == x) return;
-	x = eval(x);
+	x = eval(x, 1);
 	if (echo) {
 		print_form(x);
 		nl();

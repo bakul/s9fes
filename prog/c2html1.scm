@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; c2html -- print C code to HTML
 ; By Nils M Holm, 2009-2012

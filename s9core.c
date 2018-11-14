@@ -1,5 +1,5 @@
 /*
- * S9core Toolkit, Mk IVa
+ * S9core Toolkit, Mk IVc
  * By Nils M Holm, 2007-2018
  * In the public domain
  *
@@ -10,6 +10,7 @@
 #include "s9core.h"
 #define S9_S9CORE
 #include "s9import.h"
+#include "s9ext.h"
 
 /*
  * Global state
@@ -32,6 +33,9 @@ s9_cell		Nullstr;
 s9_cell		Blank;
 
 cell		Stack;
+
+static cell	Protect;
+static int	Protp;
 
 static cell	Free_list;
 static cell	Free_vecs;
@@ -89,14 +93,14 @@ cell	Epsilon;
 static cell	*GC_int_roots[] = {
 			&Stack, &Symbols, &Symhash, &Tmp, &Tmp_car,
 			&Tmp_cdr, &Zero, &One, &Two, &Ten, &Epsilon,
-			&Nullvec, &Nullstr, &Blank, NULL };
+			&Nullvec, &Nullstr, &Blank, &Protect, NULL };
 
 /* External GC roots */
 static cell	**GC_ext_roots = NULL;
 
 /* GC stack */
-static cell	*GC_stack;
-int		*GC_stkptr;
+cell	*S9_gc_stack;
+int	*S9_gc_stkptr;
 
 /*
  * Internal vector representation
@@ -106,6 +110,37 @@ int		*GC_stkptr;
 #define RAW_VECTOR_INDEX        1
 #define RAW_VECTOR_SIZE         2
 #define RAW_VECTOR_DATA         3
+
+/*
+ * Internal node protection
+ */
+
+#ifdef S9_BITS_PER_WORD_64
+ #define PROT_STACK_LEN	400
+#else
+ #define PROT_STACK_LEN	200
+#endif
+
+static void prot(cell x) {
+	if (Protp >= PROT_STACK_LEN-1)
+		s9_fatal("internal prot() stack overflow");
+	vector(Protect)[++Protp] = x;
+}
+
+static cell unprot(int n) {
+	cell	x;
+
+	if (Protp - n < -1)
+		s9_fatal("internal prot() stack underflow");
+	x = vector(Protect)[Protp-n+1];
+	while (n) {
+		vector(Protect)[Protp--] = UNDEFINED;
+		n--;
+	}
+	return x;
+}
+
+#define pref(n)	(vector(Protect)[Protp-(n)])
 
 /*
  * Counting
@@ -185,19 +220,19 @@ cell s9_read_counter(s9_counter *c) {
 
 	n = s9_make_integer(c->n);
 	n = cons(n, NIL);
-	save(n);
+	prot(n);
 	m = s9_make_integer(c->n1k);
 	n = cons(m, n);
-	car(Stack) = n;
+	pref(0) = n;
 	m = s9_make_integer(c->n1m);
 	n = cons(m, n);
-	car(Stack) = n;
+	pref(0) = n;
 	m = s9_make_integer(c->n1g);
 	n = cons(m, n);
-	car(Stack) = n;
+	pref(0) = n;
 	m = s9_make_integer(c->n1t);
 	n = cons(m, n);
-	s9_unsave(1);
+	unprot(1);
 	return n;
 }
 
@@ -261,7 +296,7 @@ void s9_rejectc(int c) {
 void s9_writec(int c) {
 	if (!s9_outport_open_p())
 		s9_fatal("s9_writec(): output port is not open");
-	putc(c, Ports[Output_port]);
+	(void) putc(c, Ports[Output_port]);
 }
 
 char *s9_open_input_string(char *s) {
@@ -783,7 +818,7 @@ void add_symhash(cell x) {
 	vector(Symhash)[0] = new;
 }
 
-int s9_find_symbol(char *s) {
+cell s9_find_symbol(char *s) {
 	unsigned int	h, k;
 	cell		n;
 
@@ -852,6 +887,13 @@ cell s9_make_vector(int k) {
 	return s9_new_vec(T_VECTOR, k * sizeof(cell));
 }
 
+cell s9_mkfix(int v) {
+	cell	n;
+
+	n = new_atom(v, NIL);
+	return new_atom(T_FIXNUM, n);
+}
+
 cell s9_make_integer(cell i) {
 	cell	n;
 
@@ -895,10 +937,10 @@ static cell S9_make_quick_real(int flags, cell exp, cell mant) {
 cell S9_make_real(int flags, cell exp, cell mant) {
 	cell	r;
 
-	save(mant);
+	prot(mant);
 	r = S9_make_quick_real(flags, exp, mant);
 	r = real_normalize(r);
-	s9_unsave(1);
+	unprot(1);
 	return r;
 }
 
@@ -1016,7 +1058,7 @@ cell s9_flat_copy(cell n, cell *lastp) {
 		return NIL;
 	}
 	m = s9_cons3(NIL, NIL, Tag[n]);
-	save(m);
+	prot(m);
 	a = m;
 	last = m;
 	while (n != NIL) {
@@ -1029,7 +1071,7 @@ cell s9_flat_copy(cell n, cell *lastp) {
 			a = cdr(a);
 		}
 	}
-	s9_unsave(1);
+	unprot(1);
 	if (lastp != NULL)
 		lastp[0] = last;
 	return m;
@@ -1080,7 +1122,7 @@ cell s9_argv_to_list(char **argv) {
 
 	if (argv[0] == NULL) return NIL;
 	a = cons(NIL, NIL);
-	save(a);
+	prot(a);
 	for (i = 0; argv[i] != NULL; i++) {
 		n = s9_make_string(argv[i], strlen(argv[i]));
 		car(a) = n;
@@ -1090,7 +1132,7 @@ cell s9_argv_to_list(char **argv) {
 			a = cdr(a);
 		}
 	}
-	return s9_unsave(1);
+	return unprot(1);
 }
 
 #ifdef plan9
@@ -1131,20 +1173,20 @@ int system(char *cmd) {
 cell s9_bignum_abs(cell a) {
 	cell	n;
 
-	save(a);
+	prot(a);
 	n = new_atom(labs(cadr(a)), cddr(a));
 	n = new_atom(T_INTEGER, n);
-	s9_unsave(1);
+	unprot(1);
 	return n;
 }
 
 cell s9_bignum_negate(cell a) {
 	cell	n;
 
-	save(a);
+	prot(a);
 	n = new_atom(-cadr(a), cddr(a));
 	n = new_atom(T_INTEGER, n);
-	s9_unsave(1);
+	unprot(1);
 	return n;
 }
 
@@ -1176,9 +1218,9 @@ static cell Bignum_add(cell a, cell b) {
 		if (bignum_negative_p(b)) {
 			/* -A+-B --> -(|A|+|B|) */
 			a = s9_bignum_abs(a);
-			save(a);
+			prot(a);
 			a = s9_bignum_add(a, s9_bignum_abs(b));
-			s9_unsave(1);
+			unprot(1);
 			return s9_bignum_negate(a);
 		}
 		else {
@@ -1192,12 +1234,12 @@ static cell Bignum_add(cell a, cell b) {
 	}
 	/* A+B */
 	a = reverse_segments(cdr(a));
-	save(a);
+	prot(a);
 	b = reverse_segments(cdr(b));
-	save(b);
+	prot(b);
 	carry = 0;
 	result = NIL;
-	save(result);
+	prot(result);
 	while (a != NIL || b != NIL || carry) {
 		fa = a == NIL? 0: car(a);
 		fb = b == NIL? 0: car(b);
@@ -1208,21 +1250,21 @@ static cell Bignum_add(cell a, cell b) {
 			carry = 1;
 		}
 		result = new_atom(r, result);
-		car(Stack) = result;
+		pref(0) = result;
 		if (a != NIL) a = cdr(a);
 		if (b != NIL) b = cdr(b);
 	}
-	s9_unsave(3);
+	unprot(3);
 	return new_atom(T_INTEGER, result);
 }
 
 cell s9_bignum_add(cell a, cell b) {
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	a = Bignum_add(a, b);
-	s9_unsave(2);
+	unprot(2);
 	return a;
 }
 
@@ -1239,9 +1281,9 @@ int s9_bignum_less_p(cell a, cell b) {
 	if (ka > kb) return neg_a? 1: 0;
 	Tmp = b;
 	a = s9_bignum_abs(a);
-	save(a);
+	prot(a);
 	b = s9_bignum_abs(b);
-	s9_unsave(1);
+	unprot(1);
 	Tmp = NIL;
 	a = cdr(a);
 	b = cdr(b);
@@ -1274,9 +1316,9 @@ static cell Bignum_subtract(cell a, cell b) {
 		if (bignum_negative_p(b)) {
 			/* -A--B --> -A+|B| --> |B|-|A| */
 			a = s9_bignum_abs(a);
-			save(a);
+			prot(a);
 			a = s9_bignum_subtract(s9_bignum_abs(b), a);
-			s9_unsave(1);
+			unprot(1);
 			return a;
 		}
 		else {
@@ -1294,12 +1336,12 @@ static cell Bignum_subtract(cell a, cell b) {
 		return s9_bignum_negate(s9_bignum_subtract(b, a));
 	/* A-B, A>=B */
 	a = reverse_segments(cdr(a));
-	save(a);
+	prot(a);
 	b = reverse_segments(cdr(b));
-	save(b);
+	prot(b);
 	borrow = 0;
 	result = NIL;
-	save(result);
+	prot(result);
 	while (a != NIL || b != NIL || borrow) {
 		fa = a == NIL? 0: car(a);
 		fb = b == NIL? 0: car(b);
@@ -1310,11 +1352,11 @@ static cell Bignum_subtract(cell a, cell b) {
 			borrow = 1;
 		}
 		result = new_atom(r, result);
-		car(Stack) = result;
+		pref(0) = result;
 		if (a != NIL) a = cdr(a);
 		if (b != NIL) b = cdr(b);
 	}
-	s9_unsave(3);
+	unprot(3);
 	while (car(result) == 0 && cdr(result) != NIL)
 		result = cdr(result);
 	return new_atom(T_INTEGER, result);
@@ -1322,11 +1364,11 @@ static cell Bignum_subtract(cell a, cell b) {
 
 cell s9_bignum_subtract(cell a, cell b) {
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	a = Bignum_subtract(a, b);
-	s9_unsave(2);
+	unprot(2);
 	return a;
 }
 
@@ -1334,12 +1376,12 @@ cell s9_bignum_shift_left(cell a, int fill) {
 	cell	r, c, result;
 	int	carry;
 
-	save(a);
+	prot(a);
 	a = reverse_segments(cdr(a));
-	save(a);
+	prot(a);
 	carry = fill;
 	result = NIL;
-	save(result);
+	prot(result);
 	while (a != NIL) {
 		if (car(a) >= S9_INT_SEG_LIMIT/10) {
 			c = car(a) / (S9_INT_SEG_LIMIT/10);
@@ -1352,13 +1394,13 @@ cell s9_bignum_shift_left(cell a, int fill) {
 			carry = 0;
 		}
 		result = new_atom(r, result);
-		car(Stack) = result;
+		pref(0) = result;
 		a = cdr(a);
 	}
 	if (carry)
 		result = new_atom(carry, result);
 	result = new_atom(T_INTEGER, result);
-	s9_unsave(3);
+	unprot(3);
 	return result;
 }
 
@@ -1367,29 +1409,29 @@ cell s9_bignum_shift_right(cell a) {
 	cell	r, c, result;
 	int	carry;
 
-	save(a);
+	prot(a);
 	a = cdr(a);
-	save(a);
+	prot(a);
 	carry = 0;
 	result = NIL;
-	save(result);
+	prot(result);
 	while (a != NIL) {
 		c = car(a) % 10;
 		r = car(a) / 10;
 		r += carry * (S9_INT_SEG_LIMIT/10);
 		carry = c;
 		result = new_atom(r, result);
-		car(Stack) = result;
+		pref(0) = result;
 		a = cdr(a);
 	}
 	result = reverse_segments(result);
 	if (car(result) == 0 && cdr(result) != NIL)
 		result = cdr(result);
 	result = new_atom(T_INTEGER, result);
-	car(Stack) = result;
+	pref(0) = result;
 	carry = s9_make_integer(carry);
 	result = cons(result, carry);
-	s9_unsave(3);
+	unprot(3);
 	return result;
 }
 
@@ -1398,36 +1440,36 @@ cell s9_bignum_multiply(cell a, cell b) {
 	cell	r, i, result;
 
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	neg = bignum_negative_p(a) != bignum_negative_p(b);
 	a = s9_bignum_abs(a);
-	save(a);
+	prot(a);
 	b = s9_bignum_abs(b);
-	save(b);
+	prot(b);
 	result = Zero;
-	save(result);
+	prot(result);
 	while (!bignum_zero_p(a)) {
 		r = s9_bignum_shift_right(a);
 		i = caddr(r);
 		a = car(r);
-		caddr(Stack) = a;
+		pref(2) = a;
 		while (i) {
 			if (Abort_flag) {
-				s9_unsave(5);
+				unprot(5);
 				return Zero;
 			}
 			result = s9_bignum_add(result, b);
-			car(Stack) = result;
+			pref(0) = result;
 			i--;
 		}
 		b = s9_bignum_shift_left(b, 0);
-		cadr(Stack) = b;
+		pref(1) = b;
 	}
 	if (neg)
 		result = s9_bignum_negate(result);
-	s9_unsave(5);
+	unprot(5);
 	return result;
 }
 
@@ -1440,22 +1482,22 @@ static cell bignum_equalize(cell a, cell b) {
 	cell	r, f, r0, f0;
 
 	r0 = a;
-	save(r0);
+	prot(r0);
 	f0 = One;
-	save(f0);
+	prot(f0);
 	r = r0;
-	save(r);
+	prot(r);
 	f = f0;
-	save(f);
+	prot(f);
 	while (s9_bignum_less_p(r, b)) {
-		cadddr(Stack) = r0 = r;
-		caddr(Stack) = f0 = f;
+		pref(3) = r0 = r;
+		pref(2) = f0 = f;
 		r = s9_bignum_shift_left(r, 0);
-		cadr(Stack) = r;
+		pref(1) = r;
 		f = s9_bignum_shift_left(f, 0);
-		car(Stack) = f;
+		pref(0) = f;
 	}
-	s9_unsave(4);
+	unprot(4);
 	return cons(r0, f0);
 }
 
@@ -1469,56 +1511,56 @@ static cell Bignum_divide(cell a, cell b) {
 	neg_a = bignum_negative_p(a);
 	neg = neg_a != bignum_negative_p(b);
 	a = s9_bignum_abs(a);
-	save(a);
+	prot(a);
 	b = s9_bignum_abs(b);
-	save(b);
+	prot(b);
 	if (s9_bignum_less_p(a, b)) {
 		if (neg_a)
 			a = s9_bignum_negate(a);
-		s9_unsave(2);
+		unprot(2);
 		return cons(Zero, a);
 	}
 	b = bignum_equalize(b, a);
-	cadr(Stack) = b; /* cadr+cddddr */
-	car(Stack) = a;	/* car+cddddr */
+	pref(1) = b;
+	pref(0) = a;
 	c = NIL;
-	save(c);	/* cadddr */
+	prot(c);
 	c0 = NIL;
-	save(c0);	/* caddr */
+	prot(c0);
 	f = cdr(b);
 	b = car(b);
-	cadddr(Stack) = b;
-	save(f);	/* cadr */
+	pref(3) = b;
+	prot(f);
 	result = Zero;
-	save(result);	/* car */
+	prot(result);
 	while (!bignum_zero_p(f)) {
 		c = Zero;
-		cadddr(Stack) = c;
-		caddr(Stack) = c0 = c;
+		pref(3) = c;
+		pref(2) = c0 = c;
 		i = 0;
 		while (!s9_bignum_less_p(a, c)) {
-			caddr(Stack) = c0 = c;
+			pref(2) = c0 = c;
 			c = s9_bignum_add(c, b);
-			cadddr(Stack) = c;
+			pref(3) = c;
 			i++;
 		}
 		result = s9_bignum_shift_left(result, i-1);
-		car(Stack) = result;
+		pref(0) = result;
 		a = s9_bignum_subtract(a, c0);
-		car(cddddr(Stack)) = a;
+		pref(4) = a;
 		f = s9_bignum_shift_right(f);
 		f = car(f);
-		cadr(Stack) = f;
+		pref(1) = f;
 		b = s9_bignum_shift_right(b);
 		b = car(b);
-		cadr(cddddr(Stack)) = b;
+		pref(5) = b;
 	}
 	if (neg)
 		result = s9_bignum_negate(result);
-	car(Stack) = result;
+	pref(0) = result;
 	if (neg_a)
 		a = s9_bignum_negate(a);
-	s9_unsave(6);
+	unprot(6);
 	return cons(result, a);
 }
 
@@ -1526,11 +1568,11 @@ cell s9_bignum_divide(cell a, cell b) {
 	if (bignum_zero_p(b))
 		return UNDEFINED;
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	a = Bignum_divide(a, b);
-	s9_unsave(2);
+	unprot(2);
 	return a;
 }
 
@@ -1589,15 +1631,15 @@ static cell real_normalize(cell x) {
 	cell	m, e, r;
 	int	dgs;
 
-	save(x);
+	prot(x);
 	e = Real_exponent(x);
 	m = new_atom(T_INTEGER, Real_mantissa(x));
-	save(m);
+	prot(m);
 	dgs = count_digits(cdr(m));
 	while (dgs > S9_MANTISSA_SIZE) {
 		r = s9_bignum_shift_right(m);
 		m = car(r);
-		car(Stack) = m;
+		pref(0) = m;
 		dgs--;
 		e++;
 	}
@@ -1606,18 +1648,18 @@ static cell real_normalize(cell x) {
 		if (!bignum_zero_p(cdr(r)))
 			break;
 		m = car(r);
-		car(Stack) = m;
+		pref(0) = m;
 		e++;
 	}
 	if (bignum_zero_p(m))
 		e = 0;
 	r = new_atom(e, NIL);
 	if (count_digits(r) > S9_DIGITS_PER_CELL) {
-		s9_unsave(2);
+		unprot(2);
 		return UNDEFINED;
 	}
 	r = S9_make_quick_real(Real_flags(x), e, cdr(m));
-	s9_unsave(2);
+	unprot(2);
 	return r;
 }
 
@@ -1625,7 +1667,7 @@ cell s9_bignum_to_real(cell a) {
 	int	e, flags, d;
 	cell	m, n;
 
-	save(a);
+	prot(a);
 	m = s9_flat_copy(a, NULL);
 	cadr(m) = labs(cadr(m));
 	e = 0;
@@ -1641,7 +1683,7 @@ cell s9_bignum_to_real(cell a) {
 	flags = bignum_negative_p(a)? REAL_NEGATIVE: 0;
 	n = S9_make_quick_real(flags, e, cdr(m));
 	n = real_normalize(n);
-	s9_unsave(1);
+	unprot(1);
 	return n;
 }
 
@@ -1701,14 +1743,14 @@ static cell scale_mantissa(cell r, cell desired_e, int max_size) {
 	if (max_size && (max_size - dgs < Real_exponent(r) - desired_e))
 		return UNDEFINED;
 	n = new_atom(T_INTEGER, s9_flat_copy(Real_mantissa(r), NULL));
-	save(n);
+	prot(n);
 	e = Real_exponent(r);
 	while (e > desired_e) {
 		n = s9_bignum_shift_left(n, 0);
-		car(Stack) = n;
+		pref(0) = n;
 		e--;
 	}
-	s9_unsave(1);
+	unprot(1);
 	return S9_make_quick_real(Real_flags(r), e, cdr(n));
 }
 
@@ -1726,9 +1768,9 @@ static void autoscale(cell *pa, cell *pb) {
 
 cell shift_mantissa(cell m) {    
 	m = new_atom(T_INTEGER, m);
-	save(m);
+	prot(m);
 	m = s9_bignum_shift_right(m);
-	s9_unsave(1);
+	unprot(1);
 	return cdar(m);
 }
 
@@ -1739,25 +1781,25 @@ static int real_compare(cell a, cell b, int approx) {
 	if (integer_p(a) && integer_p(b))
 		return s9_bignum_equal_p(a, b);
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	if (integer_p(a)) {
 		a = s9_bignum_to_real(a);
-		cadr(Stack) = a;
+		pref(1) = a;
 	}
 	if (integer_p(b)) {
-		save(a);
+		prot(a);
 		b = s9_bignum_to_real(b);
-		s9_unsave(1);
-		car(Stack) = b;
+		unprot(1);
+		pref(0) = b;
 	}
 	if (Real_zero_p(a) && Real_zero_p(b)) {
-		s9_unsave(2);
+		unprot(2);
 		return 1;
 	}
 	if (Real_negative_p(a) != Real_negative_p(b)) {
-		s9_unsave(2);
+		unprot(2);
 		return 0;
 	}
 	if (approx) {
@@ -1766,16 +1808,16 @@ static int real_compare(cell a, cell b, int approx) {
 		ma = count_digits(Real_mantissa(a))+Real_exponent(a);
 		mb = count_digits(Real_mantissa(b))+Real_exponent(b);
 		if (ma != mb) {
-			s9_unsave(2);
+			unprot(2);
 			return 0;
 		}
 		p = ma-S9_MANTISSA_SIZE;
-		s9_save(d);
+		prot(d);
 		e = S9_make_quick_real(0, p, cdr(One));
-		s9_unsave(3);
+		unprot(3);
 		return !s9_real_less_p(e, d);
 	}
-	s9_unsave(2);
+	unprot(2);
 	if (Real_exponent(a) != Real_exponent(b))
 		return 0;
 	ma = Real_mantissa(a);
@@ -1807,17 +1849,17 @@ int s9_real_less_p(cell a, cell b) {
 	if (integer_p(a) && integer_p(b))
 		return s9_bignum_less_p(a, b);
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	if (integer_p(a))
 		a = s9_bignum_to_real(a);
 	if (integer_p(b)) {
-		save(a);
+		prot(a);
 		b = s9_bignum_to_real(b);
-		s9_unsave(1);
+		unprot(1);
 	}
-	s9_unsave(2);
+	unprot(2);
 	if (Real_negative_p(a) && !Real_negative_p(b)) return 1;
 	if (Real_negative_p(b) && !Real_negative_p(a)) return 0;
 	if (Real_zero_p(a) && Real_positive_p(b)) return 1;
@@ -1828,11 +1870,11 @@ int s9_real_less_p(cell a, cell b) {
 	if (dpa < dpb) return neg? 0: 1;
 	if (dpa > dpb) return neg? 1: 0;
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	autoscale(&a, &b);
-	s9_unsave(2);
+	unprot(2);
 	if (a == UNDEFINED) return neg? 1: 0;
 	if (b == UNDEFINED) return neg? 0: 1;
 	ma = Real_mantissa(a);
@@ -1857,53 +1899,53 @@ cell s9_real_add(cell a, cell b) {
 	if (integer_p(a) && integer_p(b))
 		return s9_bignum_add(a, b);
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	if (integer_p(a))
 		a = s9_bignum_to_real(a);
-	save(a);
+	prot(a);
 	if (integer_p(b))
 		b = s9_bignum_to_real(b);
-	save(b);
+	prot(b);
 	if (Real_zero_p(a)) {
-		s9_unsave(4);
+		unprot(4);
 		return b;
 	}
 	if (Real_zero_p(b)) {
-		s9_unsave(4);
+		unprot(4);
 		return a;
 	}
 	autoscale(&a, &b);
 	if (a == UNDEFINED || b == UNDEFINED) {
-		ab = s9_real_abs(car(Stack));
-		save(ab);
-		aa = s9_real_abs(caddr(Stack));
-		s9_unsave(1);
-		b = s9_unsave(1);
-		a = s9_unsave(1);
-		s9_unsave(2);
+		ab = s9_real_abs(pref(0));
+		prot(ab);
+		aa = s9_real_abs(pref(2));
+		unprot(1);
+		b = unprot(1);
+		a = unprot(1);
+		unprot(2);
 		return s9_real_less_p(aa, ab)? b: a;
 	}
-	cadr(Stack) = a;
-	car(Stack) = b;
+	pref(1) = a;
+	pref(0) = b;
 	e = Real_exponent(a);
 	nega = Real_negative_p(a);
 	negb = Real_negative_p(b);
 	a = new_atom(T_INTEGER, Real_mantissa(a));
 	if (nega)
 		a = s9_bignum_negate(a);
-	cadr(Stack) = a;
+	pref(1) = a;
 	b = new_atom(T_INTEGER, Real_mantissa(b));
 	if (negb)
 		b = s9_bignum_negate(b);
-	car(Stack) = b;
+	pref(0) = b;
 	m = s9_bignum_add(a, b);
 	flags = bignum_negative_p(m)? REAL_NEGATIVE: 0;
 	r = s9_bignum_abs(m);
 	r = S9_make_quick_real(flags, e, cdr(r));
 	r = real_normalize(r);
-	s9_unsave(4);
+	unprot(4);
 	return r;
 }
 
@@ -1911,16 +1953,16 @@ cell s9_real_subtract(cell a, cell b) {
 	cell	r;
 
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	if (integer_p(b))
 		b = s9_bignum_negate(b);
 	else
 		b = Real_negate(b);
-	save(b);
+	prot(b);
 	r = s9_real_add(a, b);
-	s9_unsave(3);
+	unprot(3);
 	return r;
 }
 
@@ -1930,27 +1972,27 @@ cell s9_real_multiply(cell a, cell b) {
 	if (integer_p(a) && integer_p(b))
 		return s9_bignum_multiply(a, b);
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	if (integer_p(a))
 		a = s9_bignum_to_real(a);
-	save(a);
+	prot(a);
 	if (integer_p(b))
 		b = s9_bignum_to_real(b);
-	save(b);
+	prot(b);
 	neg = Real_negative_flag(a) != Real_negative_flag(b);
 	ea = Real_exponent(a);
 	eb = Real_exponent(b);
 	ma = new_atom(T_INTEGER, Real_mantissa(a));
-	cadr(Stack) = ma;
+	pref(1) = ma;
 	mb = new_atom(T_INTEGER, Real_mantissa(b));
-	car(Stack) = mb;
+	pref(0) = mb;
 	e = ea + eb;
 	m = s9_bignum_multiply(ma, mb);
 	r = S9_make_quick_real(neg? REAL_NEGATIVE: 0, e, cdr(m));
 	r = real_normalize(r);
-	s9_unsave(4);
+	unprot(4);
 	return r;
 }
 
@@ -1959,46 +2001,46 @@ cell s9_real_divide(cell a, cell b) {
 	int	nd, dd;
 
 	Tmp = b;
-	save(a);
-	save(b);
+	prot(a);
+	prot(b);
 	Tmp = NIL;
 	if (integer_p(a))
 		a = s9_bignum_to_real(a);
-	save(a);
+	prot(a);
 	if (integer_p(b))
 		b = s9_bignum_to_real(b);
-	save(b);
+	prot(b);
 	if (Real_zero_p(b)) {
-		s9_unsave(4);
+		unprot(4);
 		return UNDEFINED;
 	}
 	if (Real_zero_p(a)) {
 		r = S9_make_quick_real(0, 0, cdr(Zero));
-		s9_unsave(4);
+		unprot(4);
 		return r;
 	}
 	neg = Real_negative_flag(a) != Real_negative_flag(b);
 	ea = Real_exponent(a);
 	eb = Real_exponent(b);
 	ma = new_atom(T_INTEGER, Real_mantissa(a));
-	cadr(Stack) = ma;
+	pref(1) = ma;
 	mb = new_atom(T_INTEGER, Real_mantissa(b));
-	car(Stack) = mb;
+	pref(0) = mb;
 	if (bignum_zero_p(mb)) {
-		s9_unsave(4);
+		unprot(4);
 		return UNDEFINED;
 	}
 	nd = count_digits(cdr(ma));
 	dd = S9_MANTISSA_SIZE + count_digits(cdr(mb));
 	while (nd < dd) {
 		ma = s9_bignum_shift_left(ma, 0);
-		cadr(Stack) = ma;
+		pref(1) = ma;
 		nd++;
 		ea--;
 	}
 	e = ea - eb;
 	m = s9_bignum_divide(ma, mb);
-	save(m);
+	prot(m);
 	div2 = s9_bignum_abs(mb);
 	div2 = s9_bignum_divide(div2, Two);
 	div2 = car(div2);
@@ -2010,7 +2052,7 @@ cell s9_real_divide(cell a, cell b) {
 	}
 	r = S9_make_quick_real(neg? REAL_NEGATIVE: 0, e, cdr(m));
 	r = real_normalize(r);
-	s9_unsave(5);
+	unprot(5);
 	return r;
 }
 
@@ -2022,24 +2064,24 @@ cell s9_real_sqrt(cell x) {
 		return UNDEFINED;
 	if (s9_real_zero_p(x))
 		return Zero;
-	save(x);
+	prot(x);
 	n0 = x;
-	save(n0);
+	prot(n0);
 	while (1) {
 		n1 = s9_real_divide(x, n0);
 		if (n1 == UNDEFINED)
 			break;
 		n1 = s9_real_add(n1, n0);
 		n1 = s9_real_divide(n1, Two);
-		save(n1);
+		prot(n1);
 		r = s9_real_approx_p(n0, n1);
-		n0 = s9_unsave(1);
+		n0 = unprot(1);
 		if (r) {
 			break;
 		}
-		car(Stack) = n0;
+		pref(0) = n0;
 	}
-	s9_unsave(2);
+	unprot(2);
 	return n1;
 }
 
@@ -2057,46 +2099,46 @@ static cell rpower(cell x, cell y, cell prec) {
 	if (s9_real_equal_p(y, One))
 		return x;
 	if (!s9_real_less_p(y, Ten)) {
-		save(x);
+		prot(x);
 		n = s9_real_divide(y, Two);
-		car(Stack) = n;
+		pref(0) = n;
 		nprec = s9_real_divide(prec, Two);
-		save(nprec);
+		prot(nprec);
 		n = rpower(x, n, nprec);
 		if (n == UNDEFINED || Abort_flag) {
-			s9_unsave(2);
+			unprot(2);
 			return UNDEFINED;
 		}
-		s9_unsave(1);
-		car(Stack) = n;
+		unprot(1);
+		pref(0) = n;
 		n = s9_real_multiply(n, n);
-		s9_unsave(1);
+		unprot(1);
 		return n;
 	}
 	if (!s9_real_less_p(y, One)) {
 		y = s9_real_subtract(y, One);
-		save(y);
+		prot(y);
 		n = rpower(x, y, prec);
 		if (n == UNDEFINED || Abort_flag) {
-			s9_unsave(1);
+			unprot(1);
 			return UNDEFINED;
 		}
-		s9_unsave(1);
+		unprot(1);
 		n = s9_real_multiply(x, n);
 		return n;
 	}
 	if (!s9_real_less_p(prec, One))
 		return s9_real_sqrt(x);
 	y = s9_real_multiply(y, Two);
-	save(y);
+	prot(y);
 	nprec = s9_real_multiply(prec, Two);
-	save(nprec);
+	prot(nprec);
 	n = rpower(x, y, nprec);
 	if (n == UNDEFINED || Abort_flag) {
-		s9_unsave(2);
+		unprot(2);
 		return UNDEFINED;
 	}
-	s9_unsave(2);
+	unprot(2);
 	return s9_real_sqrt(n);
 }
 
@@ -2110,98 +2152,75 @@ static cell npower(cell x, cell y) {
 		return One;
 	if (s9_real_equal_p(y, One))
 		return x; 
-	save(x);
+	prot(x);
 	n = s9_bignum_divide(y, Two);
 	even = bignum_zero_p(cdr(n));
-	car(Stack) = n;
+	pref(0) = n;
 	n = npower(x, car(n));
 	if (Abort_flag) {
-		s9_unsave(1);
+		unprot(1);
 		return Zero;
 	}
-	car(Stack) = n;
+	pref(0) = n;
 	n = s9_real_multiply(n, n);
-	car(Stack) = n;
+	pref(0) = n;
 	if (!even) {
 		n = s9_real_multiply(x, n);
-		car(Stack) = n;
+		pref(0) = n;
 	}
-	s9_unsave(1);
+	unprot(1);
 	return n;
 }
 
 cell s9_real_power(cell x, cell y) {
 	Tmp = x;
-	save(y);
-	save(x);
+	prot(y);
+	prot(x);
 	Tmp = NIL;
 	if (integer_p(y)) {
 		x = npower(x, y);
 		if (bignum_negative_p(y))
 			x = s9_real_divide(One, x);
-		s9_unsave(2);
-		/*
-		 * Bad idea, because it can create large trails
-		 * of zeros and introduce rounding errors.
-		 *
-		if (s9_real_p(x)) {
-			y = s9_real_to_bignum(x);
-			if (y != UNDEFINED)
-				x = y;
-		}
-		 */
+		unprot(2);
 		return x;
 	}
 	if (s9_real_negative_p(y)) {
 		y = s9_real_abs(y);
-		save(y);
+		prot(y);
 		x = rpower(x, y, Epsilon);
-		s9_unsave(3);
+		unprot(3);
 		if (x == UNDEFINED)
 			return x;
 		return s9_real_divide(One, x);
 	}
 	x = rpower(x, y, Epsilon);
-	s9_unsave(2);
-	/*
-	 * See above
-	 *
-	if (real_p(x)) {
-		y = s9_real_to_bignum(x);
-		if (y != UNDEFINED)
-			x = y;
-	}
-	 */
+	unprot(2);
 	return x;
 }
 
 /* type: 0=trunc, 1=floor, 2=ceil */
 static cell rround(cell x, int type) {
-	cell	n, m, e, f, l;
+	cell	n, m, e;
 
 	e = s9_real_exponent(x);
 	if (e >= 0)
 		return x;
-	save(x);
+	prot(x);
 	m = new_atom(T_INTEGER, Real_mantissa(x));
-	save(m);
+	prot(m);
 	while (e < 0) {
 		m = s9_bignum_shift_right(m);
-		f = caddr(m);
 		m = car(m);
-		car(Stack) = m;
+		pref(0) = m;
 		e++;
 	}
-	l = s9_bignum_shift_right(m);
-	l = caddr(l);
 	if (	(type == 1 && Real_negative_p(x)) ||
-		(type == 2 && Real_positive_p(x)) ||
-		(type == 3 && f >= 5 && l % 2 != 0)
+		(type == 2 && Real_positive_p(x))
 	) {
 		m = s9_bignum_add(m, One);
 	}
 	n = S9_make_real(Real_flags(x), e, cdr(m));
-	s9_unsave(2);
+	unprot(2);
 	return n;
 }
 
@@ -2214,17 +2233,17 @@ cell s9_real_to_bignum(cell r) {
 	int	neg;
 
 	if (Real_exponent(r) >= 0) {
-		save(r);
+		prot(r);
 		neg = Real_negative_p(r);
 		n = scale_mantissa(r, 0, 0);
 		if (n == UNDEFINED) {
-			s9_unsave(1);
+			unprot(1);
 			return UNDEFINED;
 		}
 		n = new_atom(T_INTEGER, Real_mantissa(n));
 		if (neg)
 			n = s9_bignum_negate(n);
-		s9_unsave(1);
+		unprot(1);
 		return n;
 	}
 	return UNDEFINED;
@@ -2299,7 +2318,7 @@ cell s9_string_to_bignum(char *s) {
 		s++;
 	}
 	str = s9_make_string(s, strlen(s));
-	save(str);
+	prot(str);
 	s = string(str);
 	k = (int) strlen(s);
 	n = NIL;
@@ -2311,7 +2330,7 @@ cell s9_string_to_bignum(char *s) {
 		n = new_atom(v, n);
 		s = string(str);
 	}
-	s9_unsave(1);
+	unprot(1);
 	car(n) = sign * car(n);
 	return new_atom(T_INTEGER, n);
 }
@@ -2324,7 +2343,7 @@ cell s9_string_to_real(char *s) {
 	int	i, j, v;
 
 	mantissa = Zero;
-	save(mantissa);
+	prot(mantissa);
 	exponent = 0;
 	i = 0;
 	if (s[i] == '+') {
@@ -2344,13 +2363,13 @@ cell s9_string_to_real(char *s) {
 		if (found_dp)
 			exponent--;
 		mantissa = s9_bignum_shift_left(mantissa, 0);
-		car(Stack) = mantissa;
+		pref(0) = mantissa;
 		if (s[i] == '#')
 			v = 5;
 		else
 			v = s[i]-'0';
 		mantissa = s9_bignum_add(mantissa, s9_make_integer(v));
-		car(Stack) = mantissa;
+		pref(0) = mantissa;
 		i++;
 	}
 	j = 0;
@@ -2359,17 +2378,17 @@ cell s9_string_to_real(char *s) {
 	if (exponent_char_p(s[i])) {
 		i++;
 		if (!isdigit(s[i]) && s[i] != '-' && s[i] != '+') {
-			s9_unsave(1);
+			unprot(1);
 			return UNDEFINED;
 		}
 		n = s9_string_to_bignum(&s[i]);
 		if (cddr(n) != NIL) {
-			s9_unsave(1);
+			unprot(1);
 			return UNDEFINED;
 		}
 		exponent += cadr(n);
 	}
-	s9_unsave(1);
+	unprot(1);
 	n = S9_make_quick_real((neg? REAL_NEGATIVE: 0),
 			exponent, cdr(mantissa));
 	return real_normalize(n);
@@ -2484,10 +2503,50 @@ void s9_print_real(cell n) {
 	s9_print_sci_real(n);
 }
 
-cell s9_bignum_to_int(cell x) {
-	if (cddr(x) != NIL)
-		return UNDEFINED;
-	return cadr(x);
+cell s9_bignum_to_int(cell x, int *of) {
+	int	a, b, s;
+
+	*of = 0;
+	if (small_int_p(x)) return small_int_value(x);
+	if (NIL == cdddr(x)) {
+		if ((size_t) S9_INT_SEG_LIMIT > (size_t) INT_MAX)
+			s9_fatal("bignum_to_int(): multi-segment integers "
+				"unsupported in 64-bit mode");
+		a = cadr(x);
+		b = caddr(x);
+		if (a > INT_MAX / S9_INT_SEG_LIMIT) {
+			*of = 1;
+			return 0;
+		}
+		if (a < INT_MIN / S9_INT_SEG_LIMIT) {
+			*of = 1;
+			return 0;
+		}
+		s = a<0? -1: 1;
+		a = abs(a) * S9_INT_SEG_LIMIT;
+		if (b > INT_MAX - a) {
+			*of = 1;
+			return 0;
+		}
+		return s*(a+b);
+	}
+	*of = 1;
+	return 0;
+}
+
+cell s9_int_to_bignum(int v) {
+	cell	n;
+
+	if (v >= 0 && (long) v < S9_INT_SEG_LIMIT)
+		return s9_make_integer(v);
+	if (v < 0 && (long) -v < S9_INT_SEG_LIMIT)
+		return s9_make_integer(v);
+	if ((size_t) S9_INT_SEG_LIMIT > (size_t) INT_MAX)
+		s9_fatal("int_to_bignum(): multi-segment integers "
+			"unsupported in 64-bit mode");
+	n = new_atom(abs(v) % S9_INT_SEG_LIMIT, NIL);
+	n = new_atom(v / S9_INT_SEG_LIMIT, n);
+	return new_atom(T_INTEGER, n);
 }
 
 cell s9_bignum_to_string(cell x) {
@@ -2495,7 +2554,7 @@ cell s9_bignum_to_string(cell x) {
 	cell	s;
 	int	ioe;
 
-	save(x);
+	prot(x);
 	n = count_digits(cdr(x));
 	if (bignum_negative_p(x))
 		n++;
@@ -2509,7 +2568,7 @@ cell s9_bignum_to_string(cell x) {
 	IO_error = ioe;
 	Str_outport = NULL;
 	Str_outport_len = 0;
-	s9_unsave(1);
+	unprot(1);
 	if (n) {
 		return UNDEFINED;
 	}
@@ -2672,12 +2731,12 @@ static char *wrongargs(char *name, char *what) {
 	return buf;
 }
 
-char *s9_typecheck(cell f, cell a) {
+char *s9_typecheck(cell f) {
 	S9_PRIM	*p;
-	int	k, na, i;
+	int	na, i, k;
 
+	k = narg();
 	p = prim_info(f);
-	k = s9_length(a);
 	if (k < p->min_args)
 		return wrongargs(p->name, "few");
 	if (k > p->max_args && p->max_args >= 0)
@@ -2692,67 +2751,66 @@ char *s9_typecheck(cell f, cell a) {
 		case T_ANY:
 			break;
 		case T_BOOLEAN:
-			if (!boolean_p(car(a)))
+			if (!boolean_p(parg(i)))
 				return expected(i, f, "boolean");
 			break;
 		case T_CHAR:
-			if (!char_p(car(a)))
+			if (!char_p(parg(i)))
 				return expected(i, f, "char");
 			break;
 		case T_INPUT_PORT:
-			if (!input_port_p(car(a)))
+			if (!input_port_p(parg(i)))
 				return expected(i, f, "input-port");
 			break;
 		case T_INTEGER:
-			if (!integer_p(car(a)))
+			if (!integer_p(parg(i)))
 				return expected(i, f, "integer");
 			break;
 		case T_OUTPUT_PORT:
-			if (!output_port_p(car(a)))
+			if (!output_port_p(parg(i)))
 				return expected(i, f, "output-port");
 			break;
 		case T_PAIR:
-			if (atom_p(car(a)))
+			if (atom_p(parg(i)))
 				return expected(i, f, "pair");
 			break;
 		case T_LIST:
-			if (car(a) != NIL && atom_p(car(a)))
+			if (parg(i) != NIL && atom_p(parg(i)))
 				return expected(i, f, "list");
 			break;
 		case T_FUNCTION:
-			if (	!function_p(car(a)) &&
-				!primitive_p(car(a)) &&
-				!continuation_p(car(a))
+			if (	!function_p(parg(i)) &&
+				!primitive_p(parg(i)) &&
+				!continuation_p(parg(i))
 			)
 				return expected(i, f, "function");
 			break;
 		case T_REAL:
-			if (!integer_p(car(a)) && !real_p(car(a)))
+			if (!integer_p(parg(i)) && !real_p(parg(i)))
 				return expected(i, f, "number");
 			break;
 		case T_STRING:
-			if (!string_p(car(a)))
+			if (!string_p(parg(i)))
 				return expected(i, f, "string");
 			break;
 		case T_SYMBOL:
-			if (!symbol_p(car(a)))
+			if (!symbol_p(parg(i)))
 				return expected(i, f, "symbol");
 			break;
 		case T_VECTOR:
-			if (!vector_p(car(a)))
+			if (!vector_p(parg(i)))
 				return expected(i, f, "vector");
 			break;
 		}
-		a = cdr(a);
 	}
 	return NULL;
 }
 
-cell s9_apply_prim(cell f, cell a) {
+cell s9_apply_prim(cell f) {
 	S9_PRIM	*p;
 
 	p = prim_info(f);
-	return (*p->handler)(a);
+	return (*p->handler)();
 }
 
 /*
@@ -3043,6 +3101,8 @@ void s9_init(cell **extroots, cell *stack, int *stkptr) {
 	new_cons_segment();
 	new_vec_segment();
 	s9_gc();
+	Protect = s9_make_vector(PROT_STACK_LEN);
+	Protp = -1;
 	Zero = make_init_integer(0);
 	One = make_init_integer(1);
 	Two = make_init_integer(2);
@@ -3079,174 +3139,216 @@ int		Errors = 0;
 
 #define TESTFILE	"__testfile__"
 
-cell pcons(cell x) {
-	return cons(car(x), cadr(x));
+void fail(char *s) {
+	printf("Failed: %s\n", s);
+	Errors++;
+}
+
+cell pcons(void) {
+	if (narg() != 2) fail("apply_prim(0)");
+	return cons(parg(1), parg(2));
 }
 
 cell	A, B, N;
 
-cell	*Roots[] = { &A, &B, &N, NULL };
+cell	R;
+int	P;
 
-S9_PRIM P = { "cons", pcons, 2, 2, { T_ANY, T_LIST, T_ANY } };
+cell	*Roots[] = { &A, &B, &N, &R, NULL };
+
+S9_PRIM Pr = { "cons", pcons, 2, 2, { T_ANY, T_LIST, T_ANY } };
 
 void mem_error(int src) {
 	Mem_err = src;
 }
 
-void error(char *s) {
-	printf("Failed: %s\n", s);
-	Errors++;
-}
-
 void test_types(void) {
 	cell	n, m;
+	int	of;
 
-	if (!eof_p(END_OF_FILE)) error("eof_p()");
-	if (!undefined_p(UNDEFINED)) error("undefined_p()");
-	if (!unspecific_p(UNSPECIFIC)) error("unspecific_p()");
-	if (!s9_special_p(USER_SPECIALS)) error("special_p()");
-	if (!boolean_p(TRUE)) error("boolean_p(TRUE)");
-	if (!boolean_p(FALSE)) error("boolean_p(FALSE)");
+	if (!eof_p(END_OF_FILE)) fail("eof_p()");
+	if (!undefined_p(UNDEFINED)) fail("undefined_p()");
+	if (!unspecific_p(UNSPECIFIC)) fail("unspecific_p()");
+	if (!s9_special_p(USER_SPECIALS)) fail("special_p()");
+	if (!boolean_p(TRUE)) fail("boolean_p(TRUE)");
+	if (!boolean_p(FALSE)) fail("boolean_p(FALSE)");
 	n = s9_make_char('x');
-	if (!char_p(n)) error("char_p()");
-	if (char_value(n) != 'x') error("char_value()");
+	if (!char_p(n)) fail("char_p()");
+	if (char_value(n) != 'x') fail("char_value()");
 	n = s9_make_port(0, T_INPUT_PORT);
-	if (!input_port_p(n)) error("input_port_p()");
-	if (port_no(n) != 0) error("port_no(0)");
+	if (!input_port_p(n)) fail("input_port_p()");
+	if (port_no(n) != 0) fail("port_no(0)");
 	n = s9_make_integer(12345);
-	if (!integer_p(n)) error("integer_p()");
-	if (s9_bignum_to_int(n) != 12345) error("bignum_to_int()");
+	if (!integer_p(n)) fail("integer_p()");
+	if (s9_bignum_to_int(n, &of) != 12345) fail("bignum_to_int()");
 	n = cons(One, NIL);
 	n = cons(Zero, n);
-	if (!pair_p(n)) error("pair_p(1)");
-	if (!pair_p(cdr(n))) error("pair_p(1)");
-	if (car(n) != Zero) error("list/1");
-	if (cadr(n) != One) error("list/2");
-	if (cddr(n) != NIL) error("list/NIL");
+	if (!pair_p(n)) fail("pair_p(1)");
+	if (!pair_p(cdr(n))) fail("pair_p(1)");
+	if (car(n) != Zero) fail("list/1");
+	if (cadr(n) != One) fail("list/2");
+	if (cddr(n) != NIL) fail("list/NIL");
 	n = s9_make_port(1, T_OUTPUT_PORT);
-	if (!output_port_p(n)) error("output_port_p()");
-	if (port_no(n) != 1) error("port_no(1)");
-	n = s9_make_primitive(&P);
-	if (!primitive_p(n)) error("primitive_p()");
-	if (prim_slot(n) != 0) error("prim_slot()");
-	if (strcmp(prim_info(n)->name, "cons")) error("prim_info()");
-	if (!function_p(new_atom(T_FUNCTION, NIL))) error("function_p()");
+	if (!output_port_p(n)) fail("output_port_p()");
+	if (port_no(n) != 1) fail("port_no(1)");
+	n = s9_make_primitive(&Pr);
+	if (!primitive_p(n)) fail("primitive_p()");
+	if (prim_slot(n) != 0) fail("prim_slot()");
+	if (strcmp(prim_info(n)->name, "cons")) fail("prim_info()");
+	if (!function_p(new_atom(T_FUNCTION, NIL))) fail("function_p()");
 	n = s9_make_real(1, -5, s9_make_integer(12345));
-	if (!real_p(n)) error("real_p()");
-	if (s9_real_exponent(n) != -5) error("real_exponent()");
-	if (s9_bignum_to_int(s9_real_mantissa(n)) != 12345)
-		error("real_mantissa()");
+	if (!real_p(n)) fail("real_p()");
+	if (s9_real_exponent(n) != -5) fail("real_exponent()");
+	if (s9_bignum_to_int(s9_real_mantissa(n), &of) != 12345)
+		fail("real_mantissa()");
 	n = s9_make_string("hello, world!", 13);
-	if (!string_p(n)) error("string_p()");
-	if (strcmp(string(n), "hello, world!")) error("string()");
-	if (string_len(n) != 14) error("string_len()");
+	if (!string_p(n)) fail("string_p()");
+	if (strcmp(string(n), "hello, world!")) fail("string()");
+	if (string_len(n) != 14) fail("string_len()");
 	n = s9_symbol_ref("foobarbaz");
-	if (!symbol_p(n)) error("symbol_p()");
-	if (strcmp(symbol_name(n), "foobarbaz")) error("symbol_name()");
-	if (symbol_len(n) != 10) error("symbol_len()");
-	if (s9_symbol_ref("foobarbaz") != n) error("symbol_ref()");
-	if (!syntax_p(new_atom(T_SYNTAX, NIL))) error("syntax_p()");
+	if (!symbol_p(n)) fail("symbol_p()");
+	if (strcmp(symbol_name(n), "foobarbaz")) fail("symbol_name()");
+	if (symbol_len(n) != 10) fail("symbol_len()");
+	if (s9_symbol_ref("foobarbaz") != n) fail("symbol_ref()");
+	if (!syntax_p(new_atom(T_SYNTAX, NIL))) fail("syntax_p()");
 	n = s9_make_vector(100);
 	vector(n)[0] = Zero;
 	vector(n)[99] = One;
-	if (!vector_p(n)) error("vector_p()");
-	if (vector(n)[0] != Zero) error("vector(0)");
-	if (vector(n)[99] != One) error("vector(99)");
-	if (vector_len(n) != 100) error("vector_len()");
+	if (!vector_p(n)) fail("vector_p()");
+	if (vector(n)[0] != Zero) fail("vector(0)");
+	if (vector(n)[99] != One) fail("vector(99)");
+	if (vector_len(n) != 100) fail("vector_len()");
 	if (!continuation_p(new_atom(T_CONTINUATION, NIL)))
-		error("continuation_p()");
+		fail("continuation_p()");
 	n = s9_make_string("foo", 3);
 	m = s9_copy_string(n);
-	if (strcmp(string(n), string(m))) error("copy_string()");
-	if (!atom_p(new_atom(0, NIL))) error("atom_p()");
+	if (strcmp(string(n), string(m))) fail("copy_string()");
+	if (!atom_p(new_atom(0, NIL))) fail("atom_p()");
 	n = s9_new_vec(T_STRING, 100);
-	if (!string_p(n)) error("new_vec(1)");
-	if (string_len(n) != 100) error("new_vec(2)");
-	save(One);
-	save(Two);
-	if (s9_unsave(1) != Two) error("save(2)");
-	if (s9_unsave(1) != One) error("save(1)");
+	if (!string_p(n)) fail("new_vec(1)");
+	if (string_len(n) != 100) fail("new_vec(2)");
+	prot(One);
+	prot(Two);
+	if (pref(0) != Two) fail("pref(1)");
+	if (pref(1) != One) fail("pref(2)");
+	if (unprot(1) != Two) fail("prot(2)");
+	if (unprot(1) != One) fail("prot(1)");
 	if (!constant_p(s9_cons3(NIL, NIL, S9_CONST_TAG)))
-		error("constant_p()");
-	n = s9_make_primitive(&P);
-	save(n);
-	m = cons(NIL, NIL);
-	if (s9_typecheck(n, m) == NULL) error("typecheck(1)");
-	m = cons(One, NIL);
-	m = cons(NIL, m);
-	m = cons(Zero, m);
-	if (s9_typecheck(n, m) == NULL) error("typecheck(2)");
-	m = cons(One, NIL);
-	m = cons(Zero, m);
-	if (s9_typecheck(n, m) == NULL) error("typecheck(3)");
-	m = cons(NIL, NIL);
-	m = cons(Zero, m);
-	if (s9_typecheck(n, m) != NULL) error("typecheck(4)");
-	n = s9_apply_prim(n, m);
-	s9_unsave(1);
-	if (car(n) != Zero) error("apply_prim(1)");
-	if (cdr(n) != NIL) error("apply_prim(2)");
-	if (s9_find_symbol("new-symbol") != NIL) error("find_symbol(1)");
+		fail("constant_p()");
+	n = s9_make_primitive(&Pr);
+	prot(n);
+	m = cons(NIL, NIL); vector(R)[++P] = m;
+	m = s9_mkfix(1); vector(R)[++P] = m;
+	if (s9_typecheck(n) == NULL) fail("typecheck(1)");
+	P = -1;
+	m = cons(One, NIL); vector(R)[++P] = m;
+	m = cons(Zero, NIL); vector(R)[++P] = m;
+	m = s9_mkfix(2); vector(R)[++P] = m;
+	if (s9_typecheck(n) == NULL) fail("typecheck(2)");
+	P = -1;
+	m = cons(NIL, NIL); vector(R)[++P] = m;
+	m = cons(Zero, NIL); vector(R)[++P] = m;
+	m = s9_mkfix(2); vector(R)[++P] = m;
+	if (s9_typecheck(n) != NULL) fail("typecheck(3)");
+	n = s9_apply_prim(n);
+	unprot(1);
+	if (car(n) != Zero) fail("apply_prim(1)");
+	if (cdr(n) != NIL) fail("apply_prim(2)");
+	if (s9_find_symbol("new-symbol") != NIL) fail("find_symbol(1)");
 	n = s9_make_symbol("new-symbol", 10);
-	if (s9_find_symbol("new-symbol") != NIL) error("find_symbol(2)");
+	if (s9_find_symbol("new-symbol") != NIL) fail("find_symbol(2)");
 	s9_intern_symbol(n);
-	if (s9_find_symbol("new-symbol") == NIL) error("find_symbol(3)");
+	if (s9_find_symbol("new-symbol") == NIL) fail("find_symbol(3)");
 	m = s9_symbol_to_string(n);
 	if (!string_p(m) || strcmp(string(m), "new-symbol"))
-		error("symbol_to_string()");
-	if (s9_string_to_symbol(m) != n) error("string_to_symbol(1)");
+		fail("symbol_to_string()");
+	if (s9_string_to_symbol(m) != n) fail("string_to_symbol(1)");
 	s9_string_to_symbol(s9_make_string("xxyyzz", 6));
-	if (s9_find_symbol("xxyyzz") == NIL) error("string_to_symbol(2)");
-	if (s9_type_tag(Zero) != S9_T_INTEGER) error("type_tag(1)");
+	if (s9_find_symbol("xxyyzz") == NIL) fail("string_to_symbol(2)");
+	if (s9_type_tag(Zero) != S9_T_INTEGER) fail("type_tag(1)");
 	if (s9_type_tag(s9_make_string("", 0)) != S9_T_STRING)
-		error("type_tag(2)");
+		fail("type_tag(2)");
 	if (s9_type_tag(s9_symbol_ref("foo")) != S9_T_SYMBOL)
-		error("type_tag(3)");
-	if (s9_type_tag(S9_TRUE) != S9_T_BOOLEAN) error("type_tag(4)");
-	if (s9_type_tag(S9_NIL) != S9_T_NONE) error("type_tag(5)");
+		fail("type_tag(3)");
+	if (s9_type_tag(S9_TRUE) != S9_T_BOOLEAN) fail("type_tag(4)");
+	if (s9_type_tag(S9_NIL) != S9_T_NONE) fail("type_tag(5)");
+}
+
+void test_fixnum(void) {
+	int	n;
+
+	n = 1 << (sizeof(int)*8-2);
+	A = s9_mkfix(n);
+	if (!s9_fix_p(A)) fail("mkfix(1)");
+	if (s9_fixval(A) != n) fail("fixval(1)");
+	A = s9_mkfix(-n);
+	if (!s9_fix_p(A)) fail("mkfix(2)");
+	if (s9_fixval(A) != -n) fail("fixval(2)");
 }
 
 void test_bignum(void) {
 	cell	n;
+	int	of;
 
-	if (s9_bignum_to_int(Zero) != 0) error("Zero");
-	if (s9_bignum_to_int(One) != 1) error("One");
-	if (s9_bignum_to_int(Two) != 2) error("Two");
+#ifndef S9_BITS_PER_WORD_64
+	int	v;
+
+	v = INT_MAX;
+	A = s9_int_to_bignum(v);
+	if (!integer_p(A)) fail("s9_int_to_bignum(1)");
+	if (s9_bignum_to_int(A, &of) != v) fail("s9_bignum_to_int(1)");
+	A = s9_int_to_bignum(-v);
+	if (!integer_p(A)) fail("s9_int_to_bignum(2)");
+	if (s9_bignum_to_int(A, &of) != -v) fail("s9_bignum_to_int(2)");
+	A = s9_int_to_bignum(INT_MAX);
+	A = s9_bignum_add(A, One);
+	s9_bignum_to_int(A, &of);
+	if (0 == of) fail("s9_bignum_to_int(3)");
+	A = s9_string_to_bignum("123456789012345678901234567890");
+	s9_bignum_to_int(A, &of);
+	if (0 == of) fail("s9_bignum_to_int(4)");
+#endif
+	if (s9_bignum_to_int(Zero, &of) != 0) fail("Zero");
+	if (s9_bignum_to_int(One, &of) != 1) fail("One");
+	if (s9_bignum_to_int(Two, &of) != 2) fail("Two");
 	n = s9_make_integer(-123);
-	if (s9_bignum_to_int(s9_bignum_abs(n)) != 123) error("bignum_abs()");
+	if (s9_bignum_to_int(s9_bignum_abs(n), &of) != 123)
+		fail("bignum_abs()");
 	A = s9_make_integer(1235);
 	B = s9_make_integer(5678);
-	if (s9_bignum_to_int(s9_bignum_add(A, B)) != 6913)
-		error("bignum_add()");
+	if (s9_bignum_to_int(s9_bignum_add(A, B), &of) != 6913)
+		fail("bignum_add()");
 	N = s9_bignum_divide(B, A);
-	if (s9_bignum_to_int(car(N)) != 4) error("bignum_divide(1)");
-	if (s9_bignum_to_int(cdr(N)) != 738) error("bignum_divide(2)");
-	if (s9_bignum_equal_p(A, B)) error("bignum_equal_p(1)");
-	if (!s9_bignum_equal_p(A, A)) error("bignum_equal_p(2)");
-	if (s9_bignum_even_p(A)) error("bignum_even_p(1)");
-	if (!s9_bignum_even_p(B)) error("bignum_even_p(2)");
-	if (!s9_bignum_less_p(A, B)) error("bignum_less_p(1)");
-	if (s9_bignum_less_p(B, A)) error("bignum_less_p(2)");
-	if (s9_bignum_less_p(B, B)) error("bignum_less_p(3)");
+	if (s9_bignum_to_int(car(N), &of) != 4) fail("bignum_divide(1)");
+	if (s9_bignum_to_int(cdr(N), &of) != 738) fail("bignum_divide(2)");
+	if (s9_bignum_equal_p(A, B)) fail("bignum_equal_p(1)");
+	if (!s9_bignum_equal_p(A, A)) fail("bignum_equal_p(2)");
+	if (s9_bignum_even_p(A)) fail("bignum_even_p(1)");
+	if (!s9_bignum_even_p(B)) fail("bignum_even_p(2)");
+	if (!s9_bignum_less_p(A, B)) fail("bignum_less_p(1)");
+	if (s9_bignum_less_p(B, A)) fail("bignum_less_p(2)");
+	if (s9_bignum_less_p(B, B)) fail("bignum_less_p(3)");
 	N = s9_make_integer(123);
-	if (s9_bignum_to_int(s9_bignum_multiply(N, N)) != 15129)
-		error("bignum_multiply()");
-	if (s9_bignum_to_int(s9_bignum_negate(A)) != -1235)
-		error("bignum_negate()");
+	if (s9_bignum_to_int(s9_bignum_multiply(N, N), &of) != 15129)
+		fail("bignum_multiply()");
+	if (s9_bignum_to_int(s9_bignum_negate(A), &of) != -1235)
+		fail("bignum_negate()");
 	N = s9_bignum_shift_left(N, 7);
-	if (s9_bignum_to_int(N) != 1237) error("bignum_shift_left()");
+	if (s9_bignum_to_int(N, &of) != 1237) fail("bignum_shift_left()");
 	N = s9_bignum_shift_right(A);
-	if (s9_bignum_to_int(car(N)) != 123) error("bignum_shift_right(1)");
-	if (s9_bignum_to_int(cdr(N)) != 5) error("bignum_shift_right(2)");
-	if (s9_bignum_to_int(s9_bignum_subtract(A, B)) != -4443)
-		error("bignum_subtract()");
+	if (s9_bignum_to_int(car(N), &of) != 123) fail("bignum_shift_right(1)");
+	if (s9_bignum_to_int(cdr(N), &of) != 5) fail("bignum_shift_right(2)");
+	if (s9_bignum_to_int(s9_bignum_subtract(A, B), &of) != -4443)
+		fail("bignum_subtract()");
 	N = s9_bignum_to_string(A);
 	if (!string_p(N) || strcmp(string(N), "1235"))
-		error("bignum_to_string()");
+		fail("bignum_to_string()");
 }
 
 cell mant(cell x) {
-	return s9_bignum_to_int(s9_real_mantissa(x));
+	int	of;
+
+	return s9_bignum_to_int(s9_real_mantissa(x), &of);
 }
 
 cell result(cell r, cell xe, cell xm) {
@@ -3256,66 +3358,70 @@ cell result(cell r, cell xe, cell xm) {
 }
 
 void test_real(void) {
-	if (!real_p(Epsilon)) error("Epsilon");
+	int	of;
+
+	if (!real_p(Epsilon)) fail("Epsilon");
 	N = s9_make_real(1, 2, s9_make_integer(314));
-	if (Real_exponent(N) != 2) error("Real_exponent()");
-	A = s9_bignum_to_int(new_atom(T_INTEGER, Real_mantissa(N)));
-	if (A != 314) error("Real_mantissa()");
-	if (Real_negative_flag(N)) error("Real_negative_flag()");
-	if (Real_zero_p(N)) error("Real_zero_p()");
-	if (!Real_positive_p(N)) error("Real_positive_p()");
-	if (Real_negative_p(N)) error("Real_negative_p(1)");
+	if (Real_exponent(N) != 2) fail("Real_exponent()");
+	A = s9_bignum_to_int(new_atom(T_INTEGER, Real_mantissa(N)), &of);
+	if (A != 314) fail("Real_mantissa()");
+	if (Real_negative_flag(N)) fail("Real_negative_flag()");
+	if (Real_zero_p(N)) fail("Real_zero_p()");
+	if (!Real_positive_p(N)) fail("Real_positive_p()");
+	if (Real_negative_p(N)) fail("Real_negative_p(1)");
 	N = Real_negate(N);
-	if (!Real_negative_p(N)) error("Real_negative_p(2)");
+	if (!Real_negative_p(N)) fail("Real_negative_p(2)");
 	A = s9_make_real(1, 1, s9_make_integer(123));
 	B = s9_make_real(-1, -1, s9_make_integer(456));
-	if (s9_real_negative_p(s9_real_abs(B))) error("real_abs()");
+	if (s9_real_negative_p(s9_real_abs(B))) fail("real_abs()");
 	N = s9_real_add(A, B);
-	if (!result(N, -1, 11844)) error("real_add()");
+	if (!result(N, -1, 11844)) fail("real_add()");
 	N = s9_real_divide(A, Two);
-	if (!result(N, 0, 615)) error("real_divide()");
-	if (s9_real_equal_p(A, B)) error("real_equal_p(1)");
-	if (!s9_real_equal_p(A, A)) error("real_equal_p(2)");
+	if (!result(N, 0, 615)) fail("real_divide()");
+	if (s9_real_equal_p(A, B)) fail("real_equal_p(1)");
+	if (!s9_real_equal_p(A, A)) fail("real_equal_p(2)");
 	N = s9_real_floor(B);
-	if (!result(N, 0, -46)) error("real_floor()");
+	if (!result(N, 0, -46)) fail("real_floor()");
 	N = s9_real_trunc(B);
-	if (!result(N, 0, -45)) error("real_floor()");
+	if (!result(N, 0, -45)) fail("real_floor()");
 	N = s9_real_ceil(B);
-	if (!result(N, 0, -45)) error("real_ceil()");
-	if (!s9_real_integer_p(A)) error("real_integer_p(1)");
-	if (s9_real_integer_p(B)) error("real_integer_p(2)");
-	if (s9_real_less_p(A, B)) error("real_less_p(1)");
-	if (!s9_real_less_p(B, A)) error("real_less_p(1)");
-	if (s9_real_less_p(B, B)) error("real_less_p(2)");
+	if (!result(N, 0, -45)) fail("real_ceil()");
+	if (!s9_real_integer_p(A)) fail("real_integer_p(1)");
+	if (s9_real_integer_p(B)) fail("real_integer_p(2)");
+	if (s9_real_less_p(A, B)) fail("real_less_p(1)");
+	if (!s9_real_less_p(B, A)) fail("real_less_p(1)");
+	if (s9_real_less_p(B, B)) fail("real_less_p(2)");
 	N = s9_real_multiply(B, Two);
-	if (!result(N, -1, -912)) error("real_multiply()");
+	if (!result(N, -1, -912)) fail("real_multiply()");
 	N = s9_real_negate(B);
-	if (!result(N, -1, 456)) error("real_negate()");
-	if (s9_real_zero_p(N)) error("real_zero_p()");
-	if (!s9_real_positive_p(N)) error("real_positive_p()");
-	if (s9_real_negative_p(N)) error("real_negative_p(1)");
+	if (!result(N, -1, 456)) fail("real_negate()");
+	if (s9_real_zero_p(N)) fail("real_zero_p()");
+	if (!s9_real_positive_p(N)) fail("real_positive_p()");
+	if (s9_real_negative_p(N)) fail("real_negative_p(1)");
 	N = s9_real_negate(N);
-	if (!s9_real_negative_p(N)) error("real_negative_p(2)");
+	if (!s9_real_negative_p(N)) fail("real_negative_p(2)");
 	N = s9_real_subtract(A, B);
-	if (!result(N, -1, 12756)) error("real_subtract()");
+	if (!result(N, -1, 12756)) fail("real_subtract()");
 	N = s9_real_to_bignum(A);
-	if (s9_bignum_to_int(N) != 1230) error("real_to_bignum()");
+	if (s9_bignum_to_int(N, &of) != 1230) fail("real_to_bignum()");
 	N = s9_real_multiply(Ten, Ten);
 	N = s9_real_sqrt(N);
-	if (!s9_real_equal_p(N, Ten)) error("real_sqrt(1)");
+	if (!s9_real_equal_p(N, Ten)) fail("real_sqrt(1)");
 	N = s9_make_real(1, -2, s9_make_integer(256));
 	N = s9_real_sqrt(N);
 	A = s9_make_real(1, -1, s9_make_integer(16));
-	if (!s9_real_equal_p(N, A)) error("real_sqrt(2)");
+	if (!s9_real_equal_p(N, A)) fail("real_sqrt(2)");
 	N = s9_real_power(Two, Ten);
-	if (!s9_real_equal_p(N, s9_make_integer(1024))) error("real_power(1)");
+	if (!s9_real_equal_p(N, s9_make_integer(1024))) fail("real_power(1)");
 	N = s9_real_power(Two, s9_real_negate(Two));
 	A = s9_make_real(1, -2, s9_make_integer(25));
-	if (!s9_real_equal_p(N, A)) error("real_power(2)");
+	if (!s9_real_equal_p(N, A)) fail("real_power(2)");
 	A = s9_real_sqrt(Two);
 	B = s9_make_real(1, -1, s9_make_integer(5));
 	B = s9_real_power(Two, B);
-	if (!s9_real_equal_p(A, B)) error("real_power(3)");
+	if (!s9_real_equal_p(A, B)) fail("real_power(3)");
+	A = s9_make_real(1, -1, s9_make_integer(1));
+	B = s9_real_power(Two, A);
 }
 
 void print_test(char *name, void (*printer)(cell), cell n, char *s) {
@@ -3337,15 +3443,15 @@ void print_test(char *name, void (*printer)(cell), cell n, char *s) {
 	s9_close_port(p);
 	s9_set_input_port(op);
 	if (strcmp(s, b))
-		error(name);
+		fail(name);
 }
 
 void test_io(void) {
 	int	c, i, p;
 	char	b[100];
 
-	if (s9_input_port() != 0) error("input_port(1)");
-	if (s9_output_port() != 1) error("output_port(1)");
+	if (s9_input_port() != 0) fail("input_port(1)");
+	if (s9_output_port() != 1) fail("output_port(1)");
 	p = s9_open_output_port(TESTFILE, 0);
 	s9_set_output_port(p);
 	s9_prints("0123456789");
@@ -3355,12 +3461,12 @@ void test_io(void) {
 	s9_set_input_port(p);
 	for (i=0; i<5; i++) {
 		if ((c = s9_readc()) != "0123456789"[i])
-			error("readc(1)");
+			fail("readc(1)");
 	}
 	s9_rejectc(c);
 	for (i=4; i<10; i++) {
 		if ((c = s9_readc()) != "0123456789"[i])
-			error("readc(2)");
+			fail("readc(2)");
 	}
 	s9_close_port(p);
 	s9_reset_std_ports();
@@ -3371,11 +3477,11 @@ void test_io(void) {
 	s9_reset_std_ports();
 	p = s9_open_input_port(TESTFILE);
 	s9_set_input_port(p);
-	if (s9_blockread(b, 20) < 20) error("blockread()");
+	if (s9_blockread(b, 20) < 20) fail("blockread()");
 	s9_close_port(p);
 	s9_reset_std_ports();
-	if (s9_input_port() != 0) error("input_port(2)");
-	if (s9_output_port() != 1) error("output_port(2)");
+	if (s9_input_port() != 0) fail("input_port(2)");
+	if (s9_output_port() != 1) fail("output_port(2)");
 	print_test("print_bignum()", s9_print_bignum,
 			s9_string_to_bignum("-12345678901234567890"),
 			"-12345678901234567890");
@@ -3387,54 +3493,60 @@ void test_io(void) {
 			"1.2345e-2");
 	for (i=0; i<S9_MAX_PORTS*3; i++)
 		if (s9_open_input_port(TESTFILE) < 0)
-			error("port finalization");
+			fail("port finalization");
 }
 
 void test_conv(void) {
-	if (s9_integer_string_p("")) error("s9_integer_string_p(1)");
-	if (s9_integer_string_p("-")) error("s9_integer_string_p(2)");
-	if (!s9_integer_string_p("0")) error("s9_integer_string_p(3)");
-	if (!s9_integer_string_p("-1")) error("s9_integer_string_p(4)");
+	int	of;
+
+	if (s9_integer_string_p("")) fail("s9_integer_string_p(1)");
+	if (s9_integer_string_p("-")) fail("s9_integer_string_p(2)");
+	if (!s9_integer_string_p("0")) fail("s9_integer_string_p(3)");
+	if (!s9_integer_string_p("-1")) fail("s9_integer_string_p(4)");
 	if (!s9_integer_string_p("+01234567890"))
-		error("s9_integer_string_p(5)");
-	if (s9_string_numeric_p("")) error("s9_string_numeric_p(1)");
-	if (s9_string_numeric_p("-")) error("s9_string_numeric_p(2)");
-	if (!s9_string_numeric_p("0")) error("s9_string_numeric_p(3)");
-	if (!s9_string_numeric_p("-1")) error("s9_string_numeric_p(4)");
-	if (!s9_string_numeric_p("+01234567890")) error("string_numeric_p(5)");
-	if (s9_string_numeric_p(".")) error("s9_string_numeric_p(6)");
-	if (s9_string_numeric_p("0e")) error("s9_string_numeric_p(7)");
-	if (!s9_string_numeric_p(".0")) error("s9_string_numeric_p(8)");
-	if (!s9_string_numeric_p("0.")) error("s9_string_numeric_p(9)");
-	if (!s9_string_numeric_p("1e0")) error("s9_string_numeric_p(10)");
-	if (!s9_string_numeric_p("+1e-23")) error("s9_string_numeric_p(11)");
-	if (!s9_string_numeric_p("-1e+23")) error("s9_string_numeric_p(12)");
-	if (s9_bignum_to_int(s9_string_to_bignum("12345")) != 12345)
-		error("string_to_bignum()");
+		fail("s9_integer_string_p(5)");
+	if (s9_string_numeric_p("")) fail("s9_string_numeric_p(1)");
+	if (s9_string_numeric_p("-")) fail("s9_string_numeric_p(2)");
+	if (!s9_string_numeric_p("0")) fail("s9_string_numeric_p(3)");
+	if (!s9_string_numeric_p("-1")) fail("s9_string_numeric_p(4)");
+	if (!s9_string_numeric_p("+01234567890")) fail("string_numeric_p(5)");
+	if (s9_string_numeric_p(".")) fail("s9_string_numeric_p(6)");
+	if (s9_string_numeric_p("0e")) fail("s9_string_numeric_p(7)");
+	if (!s9_string_numeric_p(".0")) fail("s9_string_numeric_p(8)");
+	if (!s9_string_numeric_p("0.")) fail("s9_string_numeric_p(9)");
+	if (!s9_string_numeric_p("1e0")) fail("s9_string_numeric_p(10)");
+	if (!s9_string_numeric_p("+1e-23")) fail("s9_string_numeric_p(11)");
+	if (!s9_string_numeric_p("-1e+23")) fail("s9_string_numeric_p(12)");
+	if (s9_bignum_to_int(s9_string_to_bignum("12345"), &of) != 12345)
+		fail("string_to_bignum()");
 	N = s9_string_to_real("+12345.6e-7");
-	if (!result(N, -8, 123456)) error("string_to_real()");
+	if (!result(N, -8, 123456)) fail("string_to_real()");
 }
 
 void test_util(void) {
 	int	i;
 	cell	a, b;
 
-	if (s9_asctol("12345") != 12345) error("asctol()");
+	if (s9_asctol("12345") != 12345) fail("asctol()");
 	N = cons(NIL, NIL);
 	for (i=0; i<100; i++)
 		N = cons(NIL, N);
-	if (s9_length(N) != 101) error("length()");
+	if (s9_length(N) != 101) fail("length()");
 	N = s9_flat_copy(N, &a);
-	if (s9_length(N) != 101) error("flat_copy(1)");
+	if (s9_length(N) != 101) fail("flat_copy(1)");
 	b = cons(NIL, NIL);
 	cdr(a) = b;
-	if (s9_length(N) != 102) error("flat_copy(2)");
+	if (s9_length(N) != 102) fail("flat_copy(2)");
 }
 
 int main(void) {
-	s9_init(Roots);
+	s9_init(Roots, &R, &P);
+	R = NIL;
+	R = s9_make_vector(100);
+	P = -1;
 	s9_mem_error_handler(mem_error);
 	test_types();
+	test_fixnum();
 	test_bignum();
 	test_real();
 	test_io();
@@ -3443,5 +3555,6 @@ int main(void) {
 	s9_fini();
 	remove(TESTFILE);
 	bye(Errors);
+	return 0;
 }
 #endif /* TEST */

@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; scmpp -- Scheme pretty-printer
 ; by Nils M Holm, 2010

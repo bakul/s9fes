@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; htmlify -- convert plain text files to HTML
 ; by Nils M Holm, 2010

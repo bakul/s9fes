@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; soccat -- connect to remote hosts
 ; By Nils M Holm, 2010

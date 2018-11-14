@@ -1,4 +1,153 @@
 
+2018-11-13
+
+	Fix: LOCATE-FILE did not decode leading ~ in path names properly.
+	(s9.scm)
+
+	Misc. code clean-up. (s9.c, s9core.*)
+
+2018-11-12
+
+	Added S9core self-test to Plan 9 tests. (mkfile)
+
+	Fixed some minor bugs that kept S9 from compiling on Plan 9.
+	(s9core.h)
+
+2018-11-11
+
+	Updated TROFF macro package for EDOC. (prog/)
+
+	Corrected LOCATE-FILE help page. (help/)
+
+	Fix: REVERSE! can no longer reverse immutable lists. (s9.c)
+
+	Removed left-over help page. (help/)
+
+	Added S9core self-test to tests. (Makefile)
+
+	S9core: adjusted size of internal GC protection stack, because
+	real_power() can recurse frequently. (Note: real_power() is not
+	used by S9fES). (s9core.c)
+
+2018-11-09
+
+	Merged Linux/POSIX patches from Barak Pearlmutter's
+	downstream repository (http://github.com/barak/scheme9).
+	Thanks!
+
+	Disabled some system extension tests that failed on
+	some platforms, probably due to wrong use of SYS:FORK.
+	To be investigated! (util/systest.scm)
+
+2018-11-08
+
+	Added TROFF output mode to EDOC. (prog/)
+
+2018-11-06
+
+	Added TROFFIFY-CHAR function for escaping dangerous chars in
+	TROFF. (lib/)
+
+2018-11-05
+
+	EVAL context is now saved per file in LOAD, instead of per
+	expression. (s9.c)
+
+2018-11-04
+
+	S9core uses a more efficient way to GC-protect internal nodes
+	now, resulting in a 20% to 30% increase in real and bignum
+	performance. (s9core.c)
+
+	STRING-APPEND and VECTOR-APPEND now allocate only one single
+	fresh vector when appending multiple arguments. They basically
+	folded over their arguments before. (s9.c)
+
+2018-11-03
+
+	The / procedure signals an error now when the divisor is 0.
+	Use CATCH-ERRORS to intercept this condition and deliver
+	some value. (s9.c)
+
+	(Expt 0 0.0) and (log x) for non-positive x now signal a range
+	error. (s9.scm)
+
+	Fixed some type mismatches in the 64-bit build.
+
+	Removed 64-bit build option from Makefile and README.
+	*** Note: S9 will still build on 64-bit systems, but will use
+	*** 32-bit structures internally. This should not make any
+	*** difference to anybody. If it does, let me know!
+
+2018-11-02
+
+	Factored out MAKE-HELP-INDEX procedure. (lib/)
+
+	LIST->SET now uses a hash table when its argument exceeds
+	a certain size.
+
+	Misc. small changes to S9core. (s9core.*, s9import.h)
+
+2018-11-01
+
+	Cleaned up help directory: removed left-over pages, linked
+	missing pages. Reorganized the help system structure so that
+	no links, symlinks, or duplicate files are needed. INDEX
+	files are now local to subdirectories of help/.
+
+	Retired FIND-HELP-PATH and FIND-HELP procedures from the
+	SYS-UNIX extension.
+
+	Retired S9SYMBOLS command. (prog/)
+
+	Added FIND-HELP-PAGE procedure, which returns the full path
+	of the help file describing a given syntactic keyword or
+	procedure (or #F if no such page exists). (lib/)
+
+	Added SCAN-HELP-PAGES procedure, which searches all help pages
+	for a given keyword. This procedure replaces FIND-HELP. Unlike
+	FIND-HELP it does not require the SYS-UNIX extension. (lib/)
+
+	Updated S9HELP command and added -c (check database) option.
+	(prog/)
+
+-------------------------------------------------------------------------------
+	Major Change: argument passing to extension procedures
+-------------------------------------------------------------------------------
+
+2018-10-31
+
+	As of this release, arguments to extension procedures (extprocs)
+	are passed on the stack. In functions implementing extprocs, the
+	n'th argument is now retrieved by calling parg(n). The number
+	of arguments is returned by narg(). The extproc handler type
+	was changed from  cell (*f)(cell x)  to  cell (*f)(void).
+
+	All extproc handlers need to be adapted to use the new calling
+	conventions. The csv, curses, and sys-unix extensions already
+	have been modified accordingly.
+
+	Rationale:
+
+	In previous versions of S9fES arguments were passed as lists.
+	This method was still used in S9 Reimagined when applying
+	extension procecures. However, this approach required to
+	convert arguments on the stack to lists before passing them
+	to extension procedures. This caused unnecessary consing.
+
+2018-10-30
+
+	Retired Plan 9 system extension (ext/sys-plan9). Please see
+	https://github.com/bakul/s9fes for a more up to date version.
+
+	Note that S9fES will continue to compile and run on Plan 9,
+	but the stock version will no longer provide functions like
+	SYS:OPEN, SYS:BIND, etc. Use Bakul's version if you need
+	those!
+
+	Replaced symlinks in help/ with links (which will hopefully
+	extract to copies on non-Unix systems).
+
 2018-10-29
 
 	Added bytecode disassembler. (lib/disassemble.scm)
@@ -34,7 +183,7 @@
 	and McKay Marston. Thank you very much! (If it still does not
 	work, it's my fault alone!)
 
-	Fix: Reference trace was in wrong order in error messages. (s9.c)
+	Fix: reference trace was in wrong order in error messages. (s9.c)
 
 	Fix: GC leak in the compiler. (s9.c)
 
@@ -169,6 +318,6 @@
 
 -------------------------------------------------------------------------------
 
-The change log of S9fes (Reimagined) ends here.
+The change log of S9fES (Reimagined) ends here.
 For previous changes, see the file PREHISTORY.
 

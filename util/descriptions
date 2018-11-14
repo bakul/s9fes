@@ -44,6 +44,7 @@ explode.scm|explode|-|Explode symbols
 factor.scm|factor|-|Compute prime factors
 factorial.scm|factorial|-|Compute factorials
 filter.scm|filter|-|Extract objects from lists
+find-help-page.scm|find-help-page|-|Locate pages in the online help database
 find-help-path.scm|find-help-path|-|Locate the S9fES online help pages
 find-help.scm|find-help|-|Search S9fES online help pages
 flatten.scm|flatten|-|Convert trees to flat lists
@@ -83,6 +84,7 @@ list-tools.scm|-|List tools|-
 listq.scm|listq|-|Create list of quoted objects
 loutify-char.scm|-|Convert text to Lout input|-
 make-cats.scm|-|Create CATEGORIES.html file|-
+make-help-index.scm|make-help-index|-|Return list of all help keywords
 make-partitions.scm|make-partitions|-|Compute number-theoretic partitions
 matcher.scm|-|Pattern-based procedure dispatch|-
 math-tools.scm|-|Math tools|-
@@ -100,8 +102,6 @@ package.scm|-|First-class packages|-
 parse-optionsb.scm|-|Parse command line options|-
 partition.scm|partition|-|Partition lists
 permute.scm|permute|-|Generate permutations of sets
-plan9-tools.scm|-|Plan 9 system tools|-
-plan9.scm|-|S9fES Plan 9 interface|-
 position.scm|-|Find positions of list elements|-
 pretty-print.scm|-|Pretty printer|-
 procedures.scm|-|Collect procedure names from help files|-
@@ -134,6 +134,7 @@ s9hts.scm|-|Hypertext server|-
 s9resolve.scm|-|Resolve S9fES library references|-
 s9sos.scm|-|S9fES Simple Object System|-
 s9symbols.scm|-|Extract S9 symbols from help pages|-
+scan-help-pages.scm|scan-help-pages|-|Search help pages for keywords
 scm2html.scm|-|Render Scheme code in HTML|-
 scm2html1.scm|-|SCM2HTML command line wrapper|-
 scmpp.scm|-|PRETTY-PRINT command line wrapper|-
@@ -192,6 +193,7 @@ transpose.scm|transpose|-|Transpose matrixes
 tree-copy.scm|tree-copy|-|Copy cons structures
 tree-equalp.scm|tree-equal?|-|Compare cons structures
 tree-map.scm|tree-map|-|Map functions over trees
+troffify-char.scm|-|Convert text to TROFF input|-
 type-case.scm|-|Type-based dispatch|-
 union.scm|union|-|Union of sets
 unix-time-to-time.scm|unix-time-\&gt;time|-|Convert time spec to Unix time

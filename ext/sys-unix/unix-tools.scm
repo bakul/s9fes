@@ -7,7 +7,6 @@
 (load-from-library "append-to-output-file.scm")
 (load-from-library "basename.scm")
 (load-from-library "dirname.scm")
-(load-from-library "find-help-path.scm")
 (load-from-library "flush-output-port.scm")
 (load-from-library "format-time.scm")
 (load-from-library "leap-yearp.scm")

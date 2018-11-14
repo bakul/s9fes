@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; dupes -- find duplicate file names
 ; by Nils M Holm, 2010

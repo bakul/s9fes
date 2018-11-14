@@ -1,4 +1,4 @@
-S9 EXT  (environment-variable string)  ==>  string | #f
+S9fES  (environment-variable string)  ==>  string | #f
 
 Return the value of the environment variable STRING. If
 the variable is undefined, return #F.

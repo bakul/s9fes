@@ -6,6 +6,12 @@
  * Interface for extension procedures.
  */
 
+extern cell	Rts;
+extern int	Sp;
+
+#define parg(n)	car(vector(*GC_stack)[*GC_stkptr-(n)])
+#define narg()	fixval(vector(*GC_stack)[*GC_stkptr])
+
 #define BOL T_BOOLEAN  
 #define CHR T_CHAR     
 #define INP T_INPUT_PORT

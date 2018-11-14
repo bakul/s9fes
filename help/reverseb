@@ -6,10 +6,11 @@ than REVERSE, but does not preserve the original list. When
 porting S9fES programs, REVERSE! can be replaced by REVERSE.
 
 NOTE: When reversing a list that is bound to a symbol, the
-symbol will thereafter be bound to the *last* member of the
-list.
+symbol will thereafter no longer be bound to the list. Hence
+the expression
 
-(define x '(1 2 3 4 5))
+(set! x (reverse! x))
 
-(reverse! x)  ==>  (5 4 3 2 1)
-x             ==>  (1)
+should be used to reverse the list bound to X.
+
+(reverse! (list 1 2 3 4 5))  ==>  (5 4 3 2 1)

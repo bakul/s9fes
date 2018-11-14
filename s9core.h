@@ -1,5 +1,5 @@
 /*
- * S9core Toolkit, Mk IV
+ * S9core Toolkit, Mk IVc
  * By Nils M Holm, 2007-2018
  * In the public domain
  *
@@ -7,7 +7,7 @@
  * https://creativecommons.org/publicdomain/zero/1.0/
  */
 
-#define S9_VERSION "20181022"
+#define S9_VERSION "20181111"
 
 /*
  * Ugly prelude to figure out if
@@ -67,6 +67,8 @@
  #include <libc.h>
  #include <stdio.h>
  #include <ctype.h>
+ #include <ape/limits.h>
+ #define size_t	uvlong
  #define bye(x)	exits((x)? "error": NULL)
  #define ptrdiff_t int
 #endif
@@ -77,6 +79,7 @@
  #include <stdio.h>
  #include <string.h>
  #include <ctype.h>
+ #include <limits.h>
  #define bye(x)	exit((x)? EXIT_FAILURE: EXIT_SUCCESS)
 #endif
 
@@ -221,6 +224,7 @@
 #define S9_T_SYNTAX		(-23)
 #define S9_T_VECTOR		(-24)
 #define S9_T_CONTINUATION	(-25)
+#define S9_T_FIXNUM		(-26)
 #define S9_T_NONE		(-99)
 
 #define S9_USER_SPECIALS	(-100)
@@ -237,7 +241,7 @@ struct S9_counter {
 
 struct S9_primitive {
 	char	*name;
-	s9_cell	(*handler)(s9_cell expr);
+	s9_cell	(*handler)(void);
 	int	min_args;
 	int	max_args;	/* -1 = variadic */
 	int	arg_types[3];
@@ -266,6 +270,8 @@ struct S9_primitive {
 #define s9_vector_index(n)	(Vectors[S9_cdr[n] - 2])
 #define s9_vector_size(k)	(((k)+sizeof(s9_cell)-1) / sizeof(s9_cell) + 3)
 #define s9_vector_len(n)	(vector_size(string_len(n)) - 3)
+#define s9_fixval(x)		cadr(x)
+#define s9_small_int_value(x)	cadr(x)
 #define s9_port_no(n)		(cadr(n))
 #define s9_char_value(n)	(cadr(n))
 #define s9_prim_slot(n)		(cadr(n))
@@ -336,6 +342,8 @@ struct S9_primitive {
 	 car(n) == S9_T_CONTINUATION)
 #define s9_real_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && car(n) == S9_T_REAL)
+#define s9_fix_p(n) \
+        (!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && T_FIXNUM == car(n))
 #define s9_char_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && car(n) == S9_T_CHAR)
 #define s9_syntax_p(n) \
@@ -358,6 +366,8 @@ struct S9_primitive {
 	(s9_special_p(n) || (tag(n) & S9_ATOM_TAG) || (tag(n) & S9_VECTOR_TAG))
 
 #define s9_pair_p(x) (!s9_atom_p(x))
+
+#define s9_small_int_p(n) (NIL == cddr(n))
 
 #define s9_type_tag(n) \
 	(S9_TRUE == (n)? S9_T_BOOLEAN: \
@@ -424,6 +434,9 @@ extern s9_cell	*S9_vectors;
 
 extern s9_cell	S9_stack;
 
+extern s9_cell	*S9_gc_stack;
+extern int	*S9_gc_stkptr;
+
 extern S9_PRIM	*S9_primitives;
 
 extern s9_cell	S9_zero,
@@ -445,9 +458,13 @@ extern int	S9_error;
  * Prototypes
  */
 
+#ifdef plan9
+int	system(char *s);
+#endif
+
 void	s9_abort(void);
 void	s9_add_image_vars(s9_cell **v);
-s9_cell	s9_apply_prim(s9_cell f, s9_cell a);
+s9_cell	s9_apply_prim(s9_cell f);
 s9_cell	s9_argv_to_list(char **argv);
 long	s9_asctol(char *s);
 s9_cell	s9_bignum_abs(s9_cell a);
@@ -461,7 +478,7 @@ s9_cell	s9_bignum_negate(s9_cell a);
 s9_cell	s9_bignum_shift_left(s9_cell a, int fill);
 s9_cell	s9_bignum_shift_right(s9_cell a);
 s9_cell	s9_bignum_subtract(s9_cell a, s9_cell b);
-s9_cell	s9_bignum_to_int(s9_cell x);
+s9_cell	s9_bignum_to_int(s9_cell x, int *of);
 s9_cell	s9_bignum_to_real(s9_cell a);
 s9_cell	s9_bignum_to_string(s9_cell x);
 int	s9_blockread(char *s, int k);
@@ -492,6 +509,7 @@ int	s9_input_port(void);
 int	s9_inport_open_p(void);
 int	s9_integer_string_p(char *s);
 s9_cell	s9_intern_symbol(s9_cell y);
+s9_cell	s9_int_to_bignum(int v);
 int	s9_io_status(void);
 void	s9_io_reset(void);
 int	s9_length(s9_cell n);
@@ -507,6 +525,7 @@ s9_cell	s9_make_real(int sign, s9_cell exp, s9_cell mant);
 s9_cell	s9_make_string(char *s, int k);
 s9_cell	s9_make_symbol(char *s, int k);
 s9_cell	s9_make_vector(int k);
+s9_cell	s9_mkfix(int i);
 int	s9_new_port(void);
 s9_cell	s9_new_vec(s9_cell type, int size);
 int	s9_open_input_port(char *path);
@@ -566,7 +585,7 @@ s9_cell	s9_string_to_symbol(s9_cell x);
 s9_cell	s9_symbol_ref(char *s);
 s9_cell	s9_symbol_table(void);
 s9_cell	s9_symbol_to_string(s9_cell x);
-char	*s9_typecheck(s9_cell f, s9_cell a);
+char	*s9_typecheck(s9_cell f);
 int	s9_unlock_port(int port);
 s9_cell	s9_unsave(int k);
 void	s9_writec(int c);

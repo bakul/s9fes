@@ -34,6 +34,9 @@ The following <option>s exist;
 'LOUT-MODE: boolean
       Generate Lout output rather than HTML output.
 
+'TROFF-MODE: boolean
+      Generate TROFF output rather than HTML output.
+
 'INPUT-STRING: string
       Input is read from a string and output is written to a string.
       In string mode, the 'FULL-HTML: option does not work. When this

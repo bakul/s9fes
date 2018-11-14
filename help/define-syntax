@@ -30,10 +30,11 @@ The procedures bound by DEFINE-SYNTAX may be variadic.
 
 Procedures bound by DEFINE-SYNTAX are commonly called "macros". They
 receive their arguments in textual (unevaluated) form and they are
-called at "read time." When an expression containing a macro application
-is being read, the macro is applied to its arguments before the
-containing expression is evaluated. The application of the macro is
-replaced by the value returned by the macro.
+called at macro expansion time, i.e. after reading a program but
+before evaluating it. When an expression containing a macro application
+is being expanded, the macro is applied to its arguments and the
+application of the macro is replaced by the value returned by the
+macro.
 
 (define-syntax when
   (lambda (pred . conseq)
@@ -52,6 +53,6 @@ in the body of D:
 
 The following version does work, though, because the macro gets
 rewritten to another application of itself, which is subsequently
-evaluated:
+being expanded:
 
 (define-syntax (d x) (and (pair? x) `(d ,(cdr x)))) ; OK

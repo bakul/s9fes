@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; advgen -- generate HTML text adventures
 ; by Nils M Holm, 2010,2012

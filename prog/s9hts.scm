@@ -1,4 +1,4 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 ; s9hts -- hyper text server
 ; by Nils M Holm, 2010,2012

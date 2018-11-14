@@ -7,7 +7,7 @@ form:
         - total nodes allocated
         - conses allocated
         - vector cells allocated
-        - garbage collections
+        - garbage collections performed
 
 Each resource count will be returned as a group of integers
 representing ones, thousands, millions, etc. Note that FORM

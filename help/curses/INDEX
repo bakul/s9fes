@@ -1,0 +1,15 @@
+((curs:addch curs:addstr curs:beep curs:flash curs:move curs:mvaddch
+  curs:mvaddstr curs:refresh curs:scroll)
+ (curs:attroff curs:attron curs:attrset curs:standend curs:standout)
+ (curs:cbreak curs:clearok curs:echo curs:get-magic-value curs:idlok
+  curs:keypad curs:nl curs:nocbreak curs:nodelay curs:noecho curs:nonl
+  curs:noraw curs:raw curs:resetty curs:savetty curs:scrollok)
+ (curs:clear curs:clrtobot curs:clrtoeol)
+ (curs:color-set curs:has-colors)
+ (curs:cursoff curs:curson curs:mvcur)
+ (curs:delch curs:mvdelch curs:deleteln curs:insch curs:insertln
+  curs:mvinsch)
+ (curs:endwin curs:initscr)
+ (curs:flushinp curs:cols curs:getch curs:getyx curs:inch curs:lines
+  curs:mvgetch curs:mvinch curs:unctrl curs:ungetch)
+ (get-line))

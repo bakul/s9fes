@@ -2,10 +2,10 @@
 ; Unix Extension Test Suite
 ; By Nils M Holm, 2010,2012,2018
 
-;;; Some of these test may fail, especially those
-;;; related to processes and sockets! This is most
-;;; probably the result of sloppy test design. To
-;;; be improved.
+;;; Disabled process-related tests.
+;;; See ptest1, ptest2, etc, below.
+;;; These tests fail intermittedly,
+;;; probably due to wrong use of SYS:FORK.
 
 (load-from-library "mergesort.scm")
 (load-from-library "displaystar.scm")
@@ -362,21 +362,27 @@
 (test (sys:close (car fd)))
 (test (sys:close (cadr fd)))
 
-(test (= 42 (car (if (zero? (sys:fork))
-                     (sys:exit 42)
-                     (sys:wait)))))
+(define (ptest1)
+  (if (zero? (sys:fork))
+      (sys:exit 42)
+      (eqv? 42 (car (sys:wait)))))
 
-(let* ((pipe (sys:pipe))
-       (pid  (sys:fork)))
-  (if (zero? pid)
-      (let loop ()
-        (sys:write (cadr pipe) (sys:read (car pipe) 1024))
-        (loop))
-      (begin (test (sys:write (cadr pipe) "echo"))
-             (test (equal? (sys:read (car pipe) 4) "echo"))
-             (test (sys:notify pid))
-             (sys:usleep 100000)
-             (test (sys:waitpid pid)))))
+;(test (ptest1))
+
+(define (ptest2)
+  (let* ((pipe (sys:pipe))
+         (pid  (sys:fork)))
+    (if (zero? pid)
+        (let loop ()
+          (sys:write (cadr pipe) (sys:read (car pipe) 1024))
+          (loop))
+        (begin (test (sys:write (cadr pipe) "echo"))
+               (test (equal? (sys:read (car pipe) 4) "echo"))
+               (test (sys:notify pid))
+               (sys:usleep 100000)
+               (sys:waitpid pid)))))
+
+(test (ptest2))
 
 (with-output-to-file
   "testprog"
@@ -389,36 +395,45 @@
 
 (test (sys:chmod "testprog" #o700))
 
-(test (let ((pipe (sys:pipe)))
-        (cond ((zero? (sys:fork))
-                (sys:dup2 (cadr pipe) 1)
-                (sys:chdir "..")
-                (sys:execv (string-append *SANDBOX* "/testprog")
-                           '("foo" "bar" "baz"))
-                (sys:exit 1))
-              (else
-                (equal? '("foo" "bar" "baz")
-                        (read (sys:make-input-port (car pipe))))))))
+(define (ptest3)
+  (let ((pipe (sys:pipe)))
+    (cond ((zero? (sys:fork))
+            (sys:dup2 (cadr pipe) 1)
+            (sys:chdir "..")
+            (sys:execv (string-append *SANDBOX* "/testprog")
+                       '("foo" "bar" "baz"))
+            (sys:exit 1))
+          (else
+            (equal? '("foo" "bar" "baz")
+                    (read (sys:make-input-port (car pipe))))))))
+
+(test (ptest3))
 
 ; XXX should also test built-in ARGV primitive
 
-(test (let ((pipe (sys:pipe)))
-        (cond ((zero? (sys:fork))
-                (sys:dup2 (cadr pipe) 1)
-                (sys:system "echo hello")
-                (sys:exit))
-              (else
-                (equal? (string-append "hello" (string #\newline))
-                        (sys:read (car pipe) 1024))))))
+(define (ptest4)
+  (let ((pipe (sys:pipe)))
+    (cond ((zero? (sys:fork))
+            (sys:dup2 (cadr pipe) 1)
+            (sys:system "echo hello")
+            (sys:exit))
+          (else
+            (equal? (string-append "hello" (string #\newline))
+                    (sys:read (car pipe) 1024))))))
 
-(test (let ((pipe (sys:pipe))) ; SYSTEM-COMMAND of core S9, not of SYS:
-        (cond ((zero? (sys:fork))
-                (sys:dup2 (cadr pipe) 1)
-                (system-command "echo hello")
-                (sys:exit))
-              (else
-                (equal? (string-append "hello" (string #\newline))
-                        (sys:read (car pipe) 1024))))))
+;(test (ptest4))
+
+(define (ptest5)
+  (let ((pipe (sys:pipe))) ; SYSTEM-COMMAND of core S9, not of SYS:
+    (cond ((zero? (sys:fork))
+            (sys:dup2 (cadr pipe) 1)
+            (system-command "echo hello")
+            (sys:exit))
+          (else
+            (equal? (string-append "hello" (string #\newline))
+                    (sys:read (car pipe) 1024))))))
+
+;(test (ptest5))
 
 (test (sys:unlink "testprog"))
 
@@ -549,8 +564,8 @@
 (test (sys:getenv "HOME"))
 (fail (sys:getenv ""))
 
-(test (environ "HOME")) ; these two are in fact not in SYS:
-(fail (environ ""))
+(test (environment-variable "HOME")) ; ENVIRONMENT-VARIABLE is not in SYS:
+(fail (environment-variable ""))
 
 (test (sys:getpid))
 

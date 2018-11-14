@@ -1,10 +1,10 @@
-#! /usr/local/bin/s9 -f
+#! /usr/local/bin/s9
 
 #|edoc code|#
 
 ; edoc -- embedded documentation processor
-; By Nils M Holm, 2010,2012,2014
-; Placed in the Public Domain
+; By Nils M Holm, 2010,2012,2014,2018
+; In the public domain
 
 #|edoc------------------------------------------------------------------
 \1{EDOC}
@@ -110,16 +110,18 @@ sheet may be used to define other markup.
 \e{Note}: EDOC handles only subsets of R4RS Scheme and C89 properly.
 \e{Caveat utilitor!}
 
-\2{Synopsis}\a{synopsis}
+\2{Synopsis}
+\a{synopsis}
 
 \b{
-edoc [-iswL] [-b file] [-l lang] [-o file] [-t text] [-x name] [file ...]
+edoc [-inswL] [-b file] [-l lang] [-o file] [-t text] [-x name] [file ...]
 
 Render programs with embedded edoc sections in HTML
 
 -b file  make file headings link back to 'file'
 -i       generate index file (INDEX)
 -l lang  source language is lang (scheme, ccode)
+-n       with -s, do not attach a warning message
 -o file  write output to the given file
 -s       strip edoc sections, output raw code
 -t text  content of the HTML TITLE tag
@@ -164,11 +166,11 @@ reads a line from an input port.
 
 #|edoc------------------------------------------------------------------
 
-\k{Scm2html} and \k{c2html} render Scheme and C code in HTML (or Lout)
-with syntax highlighting. They are used to render embedded code.
-\k{Htmlify-char} and \k{loutify-char} translate "dangerous" characters
-into harmless sequences, e.g. "&" to "&amp;" in HTML and "/" into ""/""
-in Lout.
+\k{Scm2html} and \k{c2html} render Scheme and C code in HTML (or Lout
+or TROFF) with syntax highlighting. They are used to render embedded
+code.  \k{Htmlify-char}, \k{loutify-char} and \k{troffify-char}
+translate "dangerous" characters to harmless sequences, e.g. "&" to
+"&amp;" in HTML, "/" to ""/"" in Lout, and "\="" to "\="\="" in TROFF.
 
 ------------------------------------------------------------------code|#
 
@@ -176,18 +178,7 @@ in Lout.
 (load-from-library "c2html.scm")
 (load-from-library "htmlify-char.scm")
 (load-from-library "loutify-char.scm")
-
-#|edoc------------------------------------------------------------------
-
-\k{Append-to-output-file} is like \k{open-output-file}, but appends
-output to an existing file instead of truncating it.
-"standard-error.scm" contains the \k{with-output-to-stderr} procedure,
-which redirects the current output port to stderr.
-
-------------------------------------------------------------------code|#
-
-(load-from-library "append-to-output-file.scm")
-(load-from-library "standard-error.scm")
+(load-from-library "troffify-char.scm")
 
 #|edoc------------------------------------------------------------------
 
@@ -282,7 +273,9 @@ individual options.
 (define title         (option #\t 'string ""))
 (define extract       (option #\x 'string #f))
 (define lout          (option #\L #f))
+(define troff         (option #\T #f))
 (define overwrite     (option #\w #f))
+(define nowarn        (option #\n #f))
 (define prologue-file (option #\P 'string #f))
 (define epilogue-file (option #\E 'string #f))
 (define options       `(,show-help
@@ -294,9 +287,11 @@ individual options.
                         ,title
                         ,extract
                         ,overwrite
+			,nowarn
                         ,prologue-file
                         ,epilogue-file
-                        ,lout))
+                        ,lout
+                        ,troff))
 
 #|edoc------------------------------------------------------------------
 
@@ -305,16 +300,15 @@ Print an error message with an optional argument to stderr and exit.
 ------------------------------------------------------------------code|#
 
 (define (edoc-error msg . arg)
-  (with-output-to-stderr
-    (lambda ()
-      (display* "edoc: "
-                *line-no*
-                ": error: "
-                msg
-                (if (null? arg) "" ": ")
-                (if (null? arg) "" (car arg))
-                #\newline)
-      (sys:exit 1))))
+  (display* (current-error-port)
+            "edoc: "
+            *line-no*
+            ": error: "
+            msg
+            (if (null? arg) "" ": ")
+            (if (null? arg) "" (car arg))
+            #\newline)
+  (sys:exit 1))
 
 #|edoc------------------------------------------------------------------
 
@@ -387,8 +381,8 @@ Copy the file named \v{file} to the current output file.
 
 #|edoc------------------------------------------------------------------
 
-Emit the HTML and Lout prologues, respectively. The title of an HTML
-file will be the file name or, if specified on the command line, a
+Emit the HTML, Lout, or TROFF prologues, respectively. The title of an
+HTML file will be the file name or, if specified on the command line, a
 user-defined title. When both are present, they will be separated
 by a colon, file name first.
 
@@ -437,6 +431,17 @@ by a colon, file name first.
       "@Text @Begin"                       #\newline
       #\newline)))
 
+(define (troff-prologue)
+  (for-each
+    pr
+    `(".so edocbook.tr\n"
+      ".so _xref.tr\n"
+      ".EQ\n"
+      "delim $$\n"
+      "gsize 12\n"
+      "define dollar `font courier bold size -1 $`\n"
+      ".EN\n")))
+
 #|edoc------------------------------------------------------------------
 
 Write a prologue to an output file. This procedure will be called for
@@ -447,7 +452,8 @@ a warning message of the form
 
 \b{DO NOT EDIT THIS FILE! EDIT filename INSTEAD.}
 
-will be placed in a comment at the top of the output file.
+will be placed in a comment at the top of the output file. This message
+can be supressed with the \k{-n} (no message) command line option.
 
 When the desired section has not yet been reached while extracting a
 section (\k{-x}), do nothing. Otherwise print a Lout or HTML prologue,
@@ -461,18 +467,23 @@ Finally, if a "prologue file" was specified on the command line
 (define (prologue lang)
   (cond
     ((opt-val strip-doc)
-      (pr (if (eq? lang 'scheme)
-              "; DO NOT EDIT THIS FILE!"
-              "/* DO NOT EDIT THIS FILE!")
-          (if *file-name*
-              (string-append " EDIT \"" *file-name* "\" INSTEAD.")
-              "")
-          (if (eq? lang 'ccode) " */" "")
-          #\newline))
+      (cond ((not (opt-val nowarn))
+               (pr (if (eq? lang 'scheme)
+                       ";;;\n;;; DO NOT EDIT THIS FILE!"
+                       "/*\n * DO NOT EDIT THIS FILE!")
+                   (if *file-name*
+                       (string-append " EDIT \""
+                                      *file-name*
+                                      "\" INSTEAD.")
+                       "")
+                   (if (eq? lang 'ccode) "\n */\n" "\n;;;\n")
+                   #\newline))))
     ((and (opt-val extract)
           (not *extracting*)))
     ((opt-val lout)
       (lout-prologue))
+    ((opt-val troff)
+      (troff-prologue))
     (else
       (html-prologue)))
   (if (and (not (opt-val extract))
@@ -481,7 +492,7 @@ Finally, if a "prologue file" was specified on the command line
 
 #|edoc------------------------------------------------------------------
 
-Emit the HTML and Lout epilogues, respectively.
+Emit the HTML, Lout, or TROFF epilogues, respectively.
 
 ------------------------------------------------------------------code|#
 
@@ -497,6 +508,9 @@ Emit the HTML and Lout epilogues, respectively.
     pr
     '("@End @Text"  #\newline
       #\newline)))
+
+(define (troff-epilogue)
+  (for-each pr '()))
 
 #|edoc------------------------------------------------------------------
 
@@ -521,9 +535,12 @@ epilogue.
   (if (and (not (opt-val strip-doc))
            (or (not (opt-val extract))
                *extracting*))
-      (if (opt-val lout)
-          (lout-epilogue)
-          (html-epilogue)))
+      (cond ((opt-val lout)
+              (lout-epilogue))
+            ((opt-val troff)
+              (troff-epilogue))
+            (else
+              (html-epilogue))))
   (if (opt-val extract)
       (if *extracting*
           (sys:exit)
@@ -576,7 +593,7 @@ means that no mode/attribute is currently in effect.
 #|edoc------------------------------------------------------------------
 
 The \k{html-reset-attr!} and \k{lout-set-attr!} procedures terminate
-the HTML and Lout notations used for rendering attributes. For example,
+the HTML/Lout/TROFF notations used for rendering attributes. For example,
 when the \k{\\k} (keyword) attribute is in effect (\k{attr} is set to
 \k{attr-keyword}), then \k{html-reset-attr!} would output \k{</CODE>}.
 
@@ -620,16 +637,33 @@ to \k{#f}.
         ((eq? attr attr-vindex)  (pr "}}}"))
         ((eq? attr attr-nindex)  (pr "}}"))))
 
+(define (troff-reset-attr!)
+  (cond ((eq? attr attr-elem)    (pr "\""))
+        ((eq? attr attr-emph)    (pr "\\fP"))
+        ((eq? attr attr-strong)  (pr "\\fP"))
+        ((eq? attr attr-highlt)  (pr "\\fP"))
+        ((eq? attr attr-keyword) (pr "\\fP"))
+        ((eq? attr attr-anchor)  (pr "\""))
+        ((eq? attr attr-ref)     (pr ""))
+        ((eq? attr attr-var)     (pr "\"$"))
+        ((eq? attr attr-small)   (pr ""))
+        ((eq? attr attr-sub)     (pr "\" }$"))
+        ((eq? attr attr-super)   (pr "\" }$"))
+        ((eq? attr attr-index)   (pr "\""))
+        ((eq? attr attr-cindex)  (pr "\\fP\""))
+        ((eq? attr attr-vindex)  (pr "\\fP\""))
+        ((eq? attr attr-nindex)  (pr "\""))))
+
 (define (reset-attr!)
-  (if (opt-val lout)
-      (lout-reset-attr!)
-      (html-reset-attr!))
+  (cond ((opt-val lout)  (lout-reset-attr!))
+        ((opt-val troff) (troff-reset-attr!))
+        (else            (html-reset-attr!)))
   (set! attr #f))
 
 #|edoc------------------------------------------------------------------
 
-\k{Html-set-attr!} and \k{lout-set-attr!} print the corresponding HTML
-or Lout command for rendering that attribute.
+\k{Html-set-attr!} and \k{lout-set-attr!} print the corresponding HTML,
+Lout, or TROFF command for rendering that attribute.
 
 ------------------------------------------------------------------code|#
 
@@ -667,11 +701,28 @@ or Lout command for rendering that attribute.
         ((eq? x attr-vindex)  (pr "{}{@X{\""))
         ((eq? x attr-nindex)  (pr "{}{@X{\""))))
 
+(define (troff-set-attr! x)
+  (cond ((eq? x attr-elem)    (pr ".LI \""))
+        ((eq? x attr-emph)    (pr "\\f[HI]"))
+        ((eq? x attr-strong)  (pr "\\f[HB]"))
+        ((eq? x attr-highlt)  (pr "\\f[HB]"))
+        ((eq? x attr-keyword) (pr "\\f[CB]"))
+        ((eq? x attr-anchor)  (pr ".PM \""))
+        ((eq? x attr-ref)     (pr ""))
+        ((eq? x attr-var)     (pr "$\""))
+        ((eq? x attr-small)   (pr ""))
+        ((eq? x attr-sub)     (pr "$\"\" sub { roman \""))
+        ((eq? x attr-super)   (pr "$\"\" sup { roman \""))
+        ((eq? x attr-index)   (pr ".X \"")) 
+        ((eq? x attr-cindex)  (pr ".X \""))
+        ((eq? x attr-vindex)  (pr ".X \""))
+        ((eq? x attr-nindex)  (pr ".X \""))))
+
 #|edoc------------------------------------------------------------------
 
 \k{Set-attr!} first resets the current attribute (if one is in effect)
-and then sets \k{attr} the given one. It also emits the proper HTML or
-Lout sequence for rendering that attribute.
+and then sets \k{attr} the given one. It also emits the proper HTML,
+Lout, or TROFF sequence for rendering that attribute.
 
 When no mode is in effect, \k{set-attr!} selects \e{text} mode, thereby
 beginning a new paragraph.
@@ -682,16 +733,16 @@ beginning a new paragraph.
   (if (not mode)
       (set-mode! mode-text))
   (reset-attr!)
-  (if (opt-val lout)
-      (lout-set-attr! x)
-      (html-set-attr! x))
+  (cond ((opt-val lout)  (lout-set-attr! x))
+        ((opt-val troff) (troff-set-attr! x))
+        (else            (html-set-attr! x)))
   (set! attr x))
 
 #|edoc------------------------------------------------------------------
 
 \k{Html-reset-mode!} and \k{lout-reset-mode!} are like their
 counterparts for resetting attributes, but they emit markup
-for ending modes instead.
+for ending modes instead.)
 
 ------------------------------------------------------------------code|#
 
@@ -715,9 +766,21 @@ for ending modes instead.
         ((eq? mode mode-hd1)   (pr "}//" #\newline))
         ((eq? mode mode-hd2)   (pr "}//" #\newline))
         ((eq? mode mode-hd3)   (pr "}//" #\newline))
-        ((eq? mode mode-image)   (pr ".eps}}//"))
+        ((eq? mode mode-image) (pr ".eps}}//"))
         ((eq? mode mode-quote) (pr "}//" #\newline))
         ((eq? mode mode-text)  (pr "}//" #\newline))))
+
+(define (troff-reset-mode!)
+  (cond ((eq? mode mode-block) (pr ".CE"))
+        ((eq? mode mode-olist) (pr ".LE"))
+        ((eq? mode mode-ulist) (pr ".LE"))
+        ((eq? mode mode-hd0)   (pr "\""))
+        ((eq? mode mode-hd1)   (pr "\""))
+        ((eq? mode mode-hd2)   (pr "\""))
+        ((eq? mode mode-hd3)   (pr "\""))
+        ((eq? mode mode-image) (pr ".eps\" 1.0"))
+        ((eq? mode mode-quote) (pr ".QE"))
+        ((eq? mode mode-text)  (pr ""))))
 
 #|edoc------------------------------------------------------------------
 
@@ -731,9 +794,9 @@ tag of the back link.
   (if (and (eq? mode mode-hd0)
            (opt-val backlink))
       (pr "</A>"))
-  (if (opt-val lout)
-      (lout-reset-mode!)
-      (html-reset-mode!))
+  (cond ((opt-val lout)  (lout-reset-mode!))
+        ((opt-val troff) (troff-reset-mode!))
+        (else            (html-reset-mode!)))
   (set! mode #f))
 
 #|edoc------------------------------------------------------------------
@@ -768,11 +831,23 @@ beginning modes instead.
         ((eq? x mode-quote) (pr "@Pa @I{"))
         ((eq? x mode-text)  (pr "@Pa{"))))
 
+(define (troff-set-mode! x)
+  (cond ((eq? x mode-block) (pr ".CB"))
+        ((eq? x mode-ulist) (pr ".LB"))
+        ((eq? x mode-olist) (pr ".LB"))
+        ((eq? x mode-hd0)   (pr ".NP \""))
+        ((eq? x mode-hd1)   (pr ".HD \""))
+        ((eq? x mode-hd2)   (pr ".SH \""))
+        ((eq? x mode-hd3)   (pr ".SU \""))
+        ((eq? x mode-image) (pr ".PSPIC -L \""))
+        ((eq? x mode-quote) (pr ".QB"))
+        ((eq? x mode-text)  (pr ".PP\n"))))
+
 (define (set-mode! x)
   (reset-mode!)
-  (if (opt-val lout)
-      (lout-set-mode! x)
-      (html-set-mode! x))
+  (cond ((opt-val lout)  (lout-set-mode! x))
+        ((opt-val troff) (troff-set-mode! x))
+        (else            (html-set-mode! x)))
   (set! mode x))
 
 #|edoc------------------------------------------------------------------
@@ -804,9 +879,9 @@ e.g. convert ">" to "&gt;" in HTML.
 ------------------------------------------------------------------code|#
 
 (define (escape-char c)
-  (if (opt-val lout)
-      (loutify-char c)
-      (htmlify-char c)))
+  (cond ((opt-val lout)  (loutify-char c))
+        ((opt-val troff) (troffify-char c))
+        (else            (htmlify-char c))))
 
 #|edoc------------------------------------------------------------------
 
@@ -957,7 +1032,7 @@ When no output file is known, the "file" part will be empty.
     (if (opt-val make-index)
         (begin
           (if (not *ndx-port*)
-              (set! *ndx-port* (append-to-output-file "INDEX")))
+              (set! *ndx-port* (open-append-file "INDEX")))
           (display* *ndx-port*
                     (if file file "")
                     TAB
@@ -973,7 +1048,8 @@ When no output file is known, the "file" part will be empty.
 Generate a unique tag name. Because reference tags would appear
 multiple times when creating multiple entries for the same keyword,
 this function appends a unique numeric suffix to each tag, e.g.:
-\k{frobnitz} would become \k{frobnitz:1}, \k{frobnitz:2}, etc.
+\k{frobnitz} would become \k{frobnitz:1}, \k{frobnitz:2}, etc. In
+TROFF mode, an underbar is used instead of the colon (\k{frobnitz_1}).
 
 A hash table is used to map tags to suffixes.
 
@@ -988,19 +1064,22 @@ A hash table is used to map tags to suffixes.
                   (else
                     (hash-table-set! *index-tags* tag 0)
                     0))))
-    (string-append tag ":" (number->string id))))
+    (if (opt-val troff)
+        (string-append tag "_" (number->string id))
+        (string-append tag ":" (number->string id)))))
 
 #|edoc------------------------------------------------------------------
 
-Create a printable reference (for Lout output). When the tag \v{s}
-is an URL (starting with "http:"), then the entire URL is included:
+Create a printable reference (for Lout or TROFF output). When the tag
+\v{s} is an URL (starting with "http:"), then the entire URL is included:
 
 \b{[url]}
 
 Otherwise the reference is assumed to point to a local anchor and a
-Lout \k{@PageOf} command will be used to insert a page number:
+Lout \k{@PageOf} (or TROFF \k{\\n[]})  command will be used to insert
+a page number:
 
-\b{[page page-number]}
+\b{[^page-number]}
 
 When a tag contains a "#" character, everything in front of the "#" is
 dropped. (Two chars are skipped starting at "#", because "#" is quoted
@@ -1016,7 +1095,9 @@ at this point.)
              (s (if k
                     (substring s (+ 2 k) (string-length s))
                     s)))
-        (string-append " [page @PageOf{\"" s "\"}]"))))
+        (if (opt-val troff)
+            (string-append " [^\\n[" s "]]")
+            (string-append " [^@PageOf{\"" s "\"}]")))))
 
 #|edoc------------------------------------------------------------------
 
@@ -1033,16 +1114,15 @@ suspicious characters.
 #|edoc------------------------------------------------------------------
 
 The \k{finish-command} procedure commits the output generated by a
-command (mode or attribute) and resets the attribute, if one is in
-effect, and the mode otherwise.
+command (mode or attribute) and then resets the mode or attribute.
 
 It also does the post-processing of the reference (\k{\\r}) and index
 (\k{\\x}, \k{\\X}, \k{\\V}, \k{\\n}) attributes as well as of the
 part (\k{\\0}) mode.
 
 When a reference attribute is processed, a printable reference is
-generated in Lout mode and the begin anchor tag is finished in
-HTML mode (by emitting the \k{">} part).
+generated in TROFF and Lout mode and the begin anchor tag is finished
+in HTML mode (by emitting the \k{">} part).
 
 Index entries are processed by extracting the tag symbol (\v{sym}) from
 \k{*output*}. When the symbol is "*", the characters preceding the
@@ -1060,7 +1140,8 @@ to \k{\\1}.
   (dec! *nested*)
   (cond ((eq? attr attr-ref)
           (set! *printref* #f)
-          (if (opt-val lout)
+          (if (or (opt-val troff)
+                  (opt-val lout))
               (set! *printref* (make-print-ref (extract-ref! #t)))
               (begin (pr (extract-ref! #t))
                      (pr "\">"))))
@@ -1075,13 +1156,19 @@ to \k{\\1}.
                            (extract-ref! #f)))
                  (star (string=? sym "*"))
                  (ctag (cond ((eq? attr attr-cindex)
-                               (if (opt-val lout)
-                                   '("@T{" "}")
-                                   '("<CODE>" "</CODE>")))
+                               (cond ((opt-val lout)
+                                       '("@T{" "}"))
+                                     ((opt-val troff)
+                                       '("\\f[CB]" "\\fP"))
+                                     (else
+                                       '("<CODE>" "</CODE>"))))
                              ((eq? attr attr-vindex)
-                               (if (opt-val lout)
-                                   '("@I{" "}")
-                                   '("<VAR>" "</VAR>")))
+                               (cond ((opt-val lout)
+                                       '("@I{" "}"))
+                                     ((opt-val troff)
+                                       '("\\f[HI]" "\\fP"))
+                                     (else
+                                       '("<VAR>" "</VAR>"))))
                              (else '("" ""))))
                  (text  (command-text))
                  (text  (if (string=? text "")
@@ -1089,13 +1176,16 @@ to \k{\\1}.
                             text))
                  (u-sym (unique-tag (if star text sym))))
             (write-ndx *to-file* (htmlname u-sym) text ctag)
-            (if (opt-val lout)
-                (pr (htmlname u-sym) "\"}{" (car ctag))
-                (pr (htmlname u-sym) "\">" (car ctag)))
-            (if star
-                (flush))))
+            (cond ((opt-val lout)
+                    (pr (htmlname u-sym) "\"}{" (car ctag)))
+                  ((opt-val troff)
+                    (pr (htmlname u-sym) "\" \"" (car ctag)))
+                  (else
+                    (pr (htmlname u-sym) "\">" (car ctag))))
+            (if star (flush))))
         ((eq? mode mode-hd0)
-          (cond ((opt-val lout)
+          (cond ((or (opt-val lout)
+                     (opt-val troff))
                   (extract-ref! #t))
                 (else
                   (close-ndx)
@@ -1106,7 +1196,11 @@ to \k{\\1}.
                   (if (opt-val backlink)
                       (pr "<A href=\""
                           (opt-val backlink)
-                          "\">"))))))
+                          "\">")))))
+        ((memq mode (list mode-block mode-quote))
+          (if (and (not (null? *output*))
+                   (not (char=? #\newline (car *output*))))
+              (push! #\newline *output*))))
   (flush)
   (if *printref*
       (begin (pr *printref*)
@@ -1114,6 +1208,21 @@ to \k{\\1}.
   (if attr
       (reset-attr!)
       (reset-mode!)))
+
+#|edoc------------------------------------------------------------------
+
+The block (\k{\\b}) and quote (\k{\\q}) commands may have their command
+tags on the same line as the included edoc-text or in separate lines.
+Because TROFF requires commands to be on separate lines, this function
+adds a newline character, if one is required.
+
+------------------------------------------------------------------code|#
+
+(define (troff-fixup s)
+  (if (and (opt-val troff)
+           (pair? (cdr s))
+           (pair? (cddr s)))
+      (push! #\newline *output*)))
 
 #|edoc------------------------------------------------------------------
 
@@ -1137,9 +1246,11 @@ commands.
 ------------------------------------------------------------------code|#
 
 (define (render s nnl)
-  (define in-command  #f)
-  (if (> nnl 0)
-      (do-break nnl))
+  (define in-command #f)
+  (cond ((and (opt-val troff) 
+              (not (eq? mode mode-block))))
+        ((positive? nnl)
+          (do-break nnl)))
   (let loop ((s (string->list s)))
     (cond ((negative? *nested*)
             (edoc-error "unmatched closing brace"))
@@ -1165,14 +1276,16 @@ commands.
                     (inc! *nested*)
                     (let ((k (car s)))
                       (case k
-                            ((#\b) (set-mode! mode-block))
+                            ((#\b) (set-mode! mode-block)
+                                   (troff-fixup s))
                             ((#\e) (set-attr! attr-emph))
                             ((#\E) (set-attr! attr-strong))
                             ((#\h) (set-attr! attr-highlt))
                             ((#\k) (set-attr! attr-keyword))
                             ((#\l) (set-attr! attr-elem))
                             ((#\o) (set-mode! mode-olist))
-                            ((#\q) (set-mode! mode-quote))
+                            ((#\q) (set-mode! mode-quote)
+                                   (troff-fixup s))
                             ((#\a) (set-attr! attr-anchor))
                             ((#\r) (set-attr! attr-ref))
                             ((#\s) (set-attr! attr-small))
@@ -1256,6 +1369,9 @@ While generating output, empty lines are simply ignored (but counted)
 and later the number of blank lines is passed to \k{render}, which
 decides what to do with them.
 
+In TROFF mode, empty lines are never passed through, because they
+would render as paragraph breaks.
+
 When a line ends with a "\\" character, a new line a read and appended
 to the current line. Even more than two lines may be joined this way.
 
@@ -1273,9 +1389,11 @@ rendering.
             (if (not (zero? *nested*))
                 (edoc-error "missing closing brace at end of edoc section"))
             (set! *nested* 0)
-            (if (not (opt-val strip-doc))
+            (if (not (opt-val troff))
                 (pr #\newline)))
           ((string=? "" line)
+            (if (not (eq? mode mode-block))
+                (reset-mode!))
             (loop (buffered-read-line) (+ 1 nnl)))
           ((opt-val strip-doc)
             (loop (buffered-read-line) 0))
@@ -1284,11 +1402,11 @@ rendering.
                   (char=? #\\ (string-ref line (- k 1)))
                   (not (and (> k 1)
                             (char=? #\\ (string-ref line (- k 2)))))))
-             (let ((k   (string-length line))
-                   (new (buffered-read-line)))
-               (if (string? new)
-                   (loop (string-append (substring line 0 (- k 1)) new) 0)
-                   (loop (substring line 0 (- k 1)) 0))))
+            (let ((k   (string-length line))
+                  (new (buffered-read-line)))
+              (if (string? new)
+                  (loop (string-append (substring line 0 (- k 1)) new) 0)
+                  (loop (substring line 0 (- k 1)) 0))))
           (else
             (render line nnl)
             (pr #\newline)
@@ -1341,9 +1459,9 @@ section to extract before it starts rendering.
 on the \k{*language*} setting. This will be either \k{scm2html} or
 \k{c2html}. These procedures accept a line of code to be highlighted
 and a set of arguments, which is best looked up in their respective
-descriptions. They return a list containing the highlighting attributes
-currently in effect and a string containing HTML or Lout formatting
-instructions.
+documentation. They return a list containing the highlighting attributes
+currently in effect and a string containing HTML, Lout, or TROFF
+formatting instructions.
 
 Because highlighting attributes may have to be preserved between
 individual lines, the attributes returned by a formatting procedures
@@ -1352,15 +1470,16 @@ the attributes are kept in the \v{attr} variable.
 
 Like \k{edoc}, \k{code} collects empty lines and outputs them only when
 they are part of a code block. It ignores them when they appear between
-code blocks and EDOC sections.
+code blocks and EDOC sections. In TROFF mode, empty lines at the
+beginning and end of code blocks are omitted.
 
 \k{Code} ignores lines containing both an EDOC start and end marker.
 In addition it resets the language to \k{#f}, if such a line contains
 the word "reset" immediately after the start marker.
 
-When a start marker without an end marker is found, the procedure
-terminates the current code block and switches to EDOC mode by calling
-\k{edoc}.
+When a start marker without an end marker in the same line is found,
+the procedure terminates the current code block and switches to EDOC
+mode by calling \k{edoc}.
 
 \k{Code} emits a prologue (via \k{prologue}) before outputting either
 code or EDOC text. It uses the \v{init} variable to indicate that it
@@ -1389,23 +1508,30 @@ containers, writes an epilogue, and exits.
     (let ((out   #f)
           (attr  '(#f #f #f 0 ()))
           (cont  #f)
-          (init  #t))
+          (init  #t)
+          (skip  (opt-val troff)))
       (let loop ((nnl 0))
         (let ((line (buffered-read-line)))
           (cond ((eof-object? line)
                   (pr (gen 'terminate: attr
-                           'lout-mode: (opt-val lout))
-                      #\newline)
+                           'lout-mode: (opt-val lout)
+                           'troff-mode: (opt-val troff))
+                      (if (opt-val troff) "" #\newline))
                   (set! attr '(#f #f #f 0 ()))
                   (if cont
                       (begin (if (not (opt-val strip-doc))
-                                 (if (opt-val lout)
-                                     (pr "}" #\newline)
-                                     (pr "</PRE>" #\newline)))
+                                 (cond ((opt-val lout)
+                                         (pr "}" #\newline))
+                                       ((opt-val troff)
+                                         (pr ".CE" #\newline))
+                                       (else
+                                         (pr "</PRE>" #\newline))))
                              (close-ndx)))
                   (epilogue))
                 ((string=? "" line)
-                  (loop (+ 1 nnl)))
+                  (if skip
+                      (loop 0)
+                      (loop (+ 1 nnl))))
                 ((edoc-start? line)
                   (set-language! (if (char=? #\# (string-ref line 0))
                                      'scheme
@@ -1416,19 +1542,25 @@ containers, writes an epilogue, and exits.
                           (loop 0))
                         (else
                           (pr (gen 'terminate: attr
-                                   'lout-mode: (opt-val lout)))
+                                   'lout-mode: (opt-val lout)
+                                   'troff-mode: (opt-val troff)))
                           (set! attr '(#f #f #f 0 ()))
                           (if (and cont (not (opt-val strip-doc)))
-                              (if (opt-val lout)
-                                  (pr "}//" #\newline)
-                                  (pr "</PRE>" #\newline)))
+                              (cond ((opt-val lout)
+                                      (pr "}//" #\newline))
+                                    ((opt-val troff)
+                                      (pr ".CE" #\newline))
+                                    (else
+                                      (pr "</PRE>" #\newline))))
                           (set! cont #f)
                           (if init
                               (prologue *language*))
                           (set! init #f)
                           (edoc)
+                          (set! skip #t)
                           (loop 0))))
                 (else
+                  (set! skip #f)
                   (if init
                       (prologue *language*))
                   (set! init #f)
@@ -1436,6 +1568,8 @@ containers, writes an epilogue, and exits.
                         (cond ((opt-val strip-doc))
                               ((opt-val lout)
                                 (pr "@Code{"))
+                              ((opt-val troff)
+                                (pr ".CB" #\newline))
                               (else
                                 (pr "<PRE class="
                                     *language*
@@ -1448,11 +1582,13 @@ containers, writes an epilogue, and exits.
                                               'tilde-quotes: #t
                                               'input-string: line
                                               'initial-style: attr
-                                              'lout-mode: (opt-val lout))))
+                                              'lout-mode: (opt-val lout)
+                                              'troff-mode: (opt-val troff))))
                         ((eq? *language* 'ccode)
                           (set! out (c2html 'input-string: line
                                             'initial-style: attr
-                                            'lout-mode: (opt-val lout))))
+                                            'lout-mode: (opt-val lout)
+                                            'troff-mode: (opt-val troff))))
                         (else
                           (edoc-error "cannot figure out source language")))
                   (do ((i 0 (+ 1 i)))
@@ -1472,7 +1608,7 @@ Print command line usage.
 ------------------------------------------------------------------code|#
 
 (define (usage)
-  (display* "Usage: edoc [-iswL] [-b file] [-l lang] [-o file] [-t title]"
+  (display* "Usage: edoc [-inswLT] [-b file] [-l lang] [-o file] [-t title]"
             " [-x name]"
             #\newline
             "            [-E file] [-P file] [file ...]"
@@ -1516,6 +1652,7 @@ command line is returned by \k{parse-options!} after parsing.
               "-b file  make headings links back to 'file'"
               "-i       generate index file (INDEX)"
               "-l lang  source language is lang (scheme, ccode)"
+              "-n       with -s, do not attach a warning message"
               "-o file  write output to the given file"
               "-s       strip edoc sections, output raw code"
               "-t text  content of the HTML TITLE tag"
@@ -1524,6 +1661,7 @@ command line is returned by \k{parse-options!} after parsing.
               "-E file  insert epilogue 'file' at end of output"
               "-P file  insert prologue 'file' at beginning of output"
               "-L       generate Lout output (experimental!)"
+              "-T       generate TROFF output"
               ""))
           (sys:exit 0))
         ((null? files)
