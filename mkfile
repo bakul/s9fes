@@ -4,10 +4,10 @@
 </$objtype/mkfile
 
 TARG=		s9
-OFILES=		s9.$O s9core.$O
+OFILES=		s9.$O s9core.$O plan9.$O s9-ffi.$O
 CLEANFILES=	s9.image test.image
-CFLAGS=		-FVw -Dplan9
-EXTRASCM=
+CFLAGS=		-FVw -Dplan9 -'DEXTENSIONS=sys_init();'
+EXTRASCM=	-l ext/sys-plan9/plan9.scm -l ext/sys-plan9/plan9-tools.scm
 
 s9dir=		/lib/s9fes
 
@@ -22,6 +22,12 @@ s9:	$O.out
 s9.image:	s9 s9.scm config.scm
 	S9_IMAGE_DIR=. S9FES_LIBRARY_PATH=lib:contrib \
 		./s9 -i - -l config.scm $EXTRASCM -d $target
+
+plan9.$O: ext/sys-plan9/plan9.c
+	$CC $CFLAGS -p -I `{pwd} ext/sys-plan9/plan9.c
+
+s9-ffi.$O:	ext/sys-plan9/s9-ffi.c
+	$CC $CFLAGS ext/sys-plan9/s9-ffi.c
 
 coretest:V:	s9core.c s9core.h s9import.h
 	$CC -Dplan9 -DTEST -o s9test.$O s9core.c
