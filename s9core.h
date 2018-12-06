@@ -10,8 +10,7 @@
 #define S9_VERSION "20181111"
 
 /*
- * Ugly prelude to figure out if
- * we are compiling on a Un*x system.
+ * Ugly prelude to deal with some system-dependent stuff.
  */
 
 #ifdef __NetBSD__
@@ -50,7 +49,6 @@
  #endif
 #endif
 
-/* Tell later MSC compilers to let us use the standard CLIB API. */
 #ifdef _MSC_VER
  #if _MSC_VER > 1200
   #ifndef _CRT_SECURE_NO_DEPRECATE
@@ -70,7 +68,7 @@
  #include <ape/limits.h>
  #define size_t	uvlong
  #define bye(x)	exits((x)? "error": NULL)
- #define ptrdiff_t int
+ #define ptrdiff_t vlong
 #endif
 
 #ifdef unix
@@ -84,20 +82,14 @@
 #endif
 
 /*
- * An "s9_cell" must be large enough to hold an integer segment;
- * see S9_INT_SEG_LIMIT, below.
+ * Tunable parameters
  */
-#ifdef S9_BITS_PER_WORD_64
- #define s9_cell	ptrdiff_t
-#else
- #define s9_cell	int
-#endif
 
-/* Default memory limit in K-nodes, 0 = none */
+/* Default memory limits in K nodes and K cells; 0 = none */
 #define S9_NODE_LIMIT	14013
 #define S9_VECTOR_LIMIT	14013
 
-/* Initial pool size in nodes */
+/* Initial memory pool sizes */
 #define S9_INITIAL_SEGMENT_SIZE	32768
 
 /* Primitive segment size (slots) */
@@ -106,90 +98,47 @@
 /* Maximum number of open I/O ports */
 #define S9_MAX_PORTS		32
 
-/* Pick one ... */
+/* Use 64-bit cells (don't do this!) */
 /* #define S9_BITS_PER_WORD_64 */
-/* #define S9_BITS_PER_WORD_32 */
-/* #define S9_BITS_PER_WORD_16 */
 
-/* ... or assume a reasonable default */
-#ifndef S9_BITS_PER_WORD_16
- #ifndef S9_BITS_PER_WORD_32
-  #ifndef S9_BITS_PER_WORD_64
-   #define S9_BITS_PER_WORD_32
-  #endif
- #endif
-#endif
+/*
+ * Non-tunable parameters
+ */
 
-/* Make sure we have made up our minds */
-#ifdef S9_BITS_PER_WORD_16
- #ifdef S9_BITS_PER_WORD_32
-  #error "Pick only one cell size!"
- #endif
- #ifdef S9_BITS_PER_WORD_64
-  #error "Pick only one cell size!"
- #endif
-#endif
-
-#ifdef S9_BITS_PER_WORD_32
- #ifdef S9_BITS_PER_WORD_16
-  #error "Pick only one cell size!"
- #endif
- #ifdef S9_BITS_PER_WORD_64
-  #error "Pick only one cell size!"
- #endif
-#endif
+/* A cell must be large enough to hold an integer segment;
+ * see S9_INT_SEG_LIMIT, below
+ */
 
 #ifdef S9_BITS_PER_WORD_64
- #ifdef S9_BITS_PER_WORD_16
-  #error "Pick only one cell size!"
- #endif
- #ifdef S9_BITS_PER_WORD_32
-  #error "Pick only one cell size!"
- #endif
+ #define s9_cell	ptrdiff_t
+#else
+ #define s9_cell	int
 #endif
-
-/*
- * Node tags
- */
-
-#define S9_ATOM_TAG	0x01	/* Atom, car = type, CDR = next */
-#define S9_MARK_TAG	0x02	/* Mark */
-#define S9_STATE_TAG	0x04	/* State */
-#define S9_VECTOR_TAG	0x08	/* Vector, car = type, CDR = content */
-#define S9_PORT_TAG	0x10	/* Atom is an I/O port (with ATOM_TAG) */
-#define S9_USED_TAG	0x20	/* Port: used flag */
-#define S9_LOCK_TAG	0x40	/* Port: locked (do not close) */
-#define S9_CONST_TAG	0x80	/* Node is immutable */
-
-/*
- * Integer segment specs
- */
 
 #ifdef S9_BITS_PER_WORD_64
  #define S9_DIGITS_PER_CELL	18
  #define S9_INT_SEG_LIMIT	1000000000000000000LL
  #define S9_MANTISSA_SEGMENTS	1
 #else
- #ifdef S9_BITS_PER_WORD_32
-  #define S9_DIGITS_PER_CELL	9
-  #define S9_INT_SEG_LIMIT	1000000000L
-  #define S9_MANTISSA_SEGMENTS	2
- #else
-  #ifdef S9_BITS_PER_WORD_16
-   #define S9_DIGITS_PER_CELL	4
-   #define S9_INT_SEG_LIMIT	10000
-   #define S9_MANTISSA_SEGMENTS	2
-  #else
-   #error "S9_BITS_PER_WORD_* undefined (this should not happen)"
-  #endif
- #endif
+ #define S9_DIGITS_PER_CELL	9
+ #define S9_INT_SEG_LIMIT	1000000000L
+ #define S9_MANTISSA_SEGMENTS	2
 #endif
 
+#define S9_MANTISSA_SIZE	(S9_MANTISSA_SEGMENTS * S9_DIGITS_PER_CELL)
+
 /*
- * Real number mantissa size
+ * Node tags
  */
 
-#define S9_MANTISSA_SIZE	(S9_MANTISSA_SEGMENTS * S9_DIGITS_PER_CELL)
+#define S9_ATOM_TAG	0x01	/* Atom, car = type, cdr = next */
+#define S9_MARK_TAG	0x02	/* Mark */
+#define S9_STATE_TAG	0x04	/* State */
+#define S9_VECTOR_TAG	0x08	/* Vector, car = type, cdr = content */
+#define S9_PORT_TAG	0x10	/* Atom is an I/O port (with ATOM_TAG) */
+#define S9_USED_TAG	0x20	/* Port: in use */
+#define S9_LOCK_TAG	0x40	/* Port: locked (do not finalize) */
+#define S9_CONST_TAG	0x80	/* Node is immutable */
 
 /*
  * Special objects
@@ -205,7 +154,7 @@
 #define S9_VOID		(-7)
 
 /*
- * Types
+ * Type tags
  */
 
 #define S9_T_ANY		(-10)
@@ -256,28 +205,6 @@ struct S9_primitive {
 #define s9_nl()		s9_prints("\n")
 
 /*
- * Access to fields of atoms
- */
-
-#define tag(n)			(S9_tag[n])
-
-#define s9_string(n)		((char *) &Vectors[S9_cdr[n]])
-#define s9_string_len(n)	(Vectors[S9_cdr[n] - 1])
-#define s9_symbol_name(n)	(string(n))
-#define s9_symbol_len(n)	(string_len(n))
-#define s9_vector(n)		(&Vectors[S9_cdr[n]])
-#define s9_vector_link(n)	(Vectors[S9_cdr[n] - 3])
-#define s9_vector_index(n)	(Vectors[S9_cdr[n] - 2])
-#define s9_vector_size(k)	(((k)+sizeof(s9_cell)-1) / sizeof(s9_cell) + 3)
-#define s9_vector_len(n)	(vector_size(string_len(n)) - 3)
-#define s9_fixval(x)		cadr(x)
-#define s9_small_int_value(x)	cadr(x)
-#define s9_port_no(n)		(cadr(n))
-#define s9_char_value(n)	(cadr(n))
-#define s9_prim_slot(n)		(cadr(n))
-#define s9_prim_info(n)		(&Primitives[prim_slot(n)])
-
-/*
  * Nested lists
  */
 
@@ -313,6 +240,30 @@ struct S9_primitive {
 #define s9_cddddr(x)       (S9_cdr[S9_cdr[S9_cdr[S9_cdr[x]]]])
 
 /*
+ * Access to fields of atoms
+ */
+
+#define s9_tag(n)		(S9_tag[n])
+
+#define s9_string(n)		((char *) &Vectors[S9_cdr[n]])
+#define s9_string_len(n)	(Vectors[S9_cdr[n] - 1])
+#define s9_symbol_name(n)	(string(n))
+#define s9_symbol_len(n)	(string_len(n))
+#define s9_vector(n)		(&Vectors[S9_cdr[n]])
+#define s9_vector_link(n)	(Vectors[S9_cdr[n] - 3])
+#define s9_vector_index(n)	(Vectors[S9_cdr[n] - 2])
+#define s9_vector_size(k)	(((k)+sizeof(s9_cell)-1) / \
+                                 sizeof(s9_cell) + 3)
+#define s9_vector_len(n)	(vector_size(string_len(n)) - 3)
+
+#define s9_fixval(x)		cadr(x)
+#define s9_small_int_value(x)	cadr(x)
+#define s9_port_no(n)		(cadr(n))
+#define s9_char_value(n)	(cadr(n))
+#define s9_prim_slot(n)		(cadr(n))
+#define s9_prim_info(n)		(&Primitives[prim_slot(n)])
+
+/*
  * Type predicates
  */
 
@@ -323,44 +274,56 @@ struct S9_primitive {
 #define s9_boolean_p(n)	\
 	((n) == S9_TRUE || (n) == S9_FALSE)
 
-#define s9_constant_p(n) \
-	(!s9_special_p(n) && (tag(n) & S9_CONST_TAG))
-
 #define s9_integer_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && car(n) == S9_T_INTEGER)
+
+#define s9_real_p(n) \
+	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && car(n) == S9_T_REAL)
+
+#define s9_fix_p(n) \
+        (!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && T_FIXNUM == car(n))
+
 #define s9_number_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && \
 	 (car(n) == S9_T_REAL || car(n) == S9_T_INTEGER))
+
 #define s9_primitive_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && \
 	 car(n) == S9_T_PRIMITIVE)
+
 #define s9_function_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && \
 	 car(n) == S9_T_FUNCTION)
+
 #define s9_continuation_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && \
 	 car(n) == S9_T_CONTINUATION)
-#define s9_real_p(n) \
-	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && car(n) == S9_T_REAL)
-#define s9_fix_p(n) \
-        (!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && T_FIXNUM == car(n))
+
 #define s9_char_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && car(n) == S9_T_CHAR)
+
 #define s9_syntax_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && car(n) == S9_T_SYNTAX)
+
 #define s9_input_port_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && \
 	 (tag(n) & S9_PORT_TAG) && car(n) == S9_T_INPUT_PORT)
+
 #define s9_output_port_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_ATOM_TAG) && \
 	 (tag(n) & S9_PORT_TAG) && car(n) == S9_T_OUTPUT_PORT)
 
 #define s9_symbol_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_VECTOR_TAG) && car(n) == S9_T_SYMBOL)
+
 #define s9_vector_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_VECTOR_TAG) && car(n) == S9_T_VECTOR)
+
 #define s9_string_p(n) \
 	(!s9_special_p(n) && (tag(n) & S9_VECTOR_TAG) && car(n) == S9_T_STRING)
+
+#define s9_constant_p(n) \
+	(!s9_special_p(n) && (tag(n) & S9_CONST_TAG))
 
 #define s9_atom_p(n) \
 	(s9_special_p(n) || (tag(n) & S9_ATOM_TAG) || (tag(n) & S9_VECTOR_TAG))
@@ -451,8 +414,6 @@ extern FILE	*S9_ports[];
 extern int	S9_input_port,
 		S9_output_port,
 		S9_error_port;
-
-extern int	S9_error;
 
 /*
  * Prototypes

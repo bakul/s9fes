@@ -497,7 +497,7 @@
                               (troff-mode
                                 (string-append
                                   out
-                                  (if Bold "\\fP" "")))
+                                  (if Bold "" "")))
                               (else
                                 out))))
               (list (list Color Bold) out)))

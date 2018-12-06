@@ -15,8 +15,19 @@
 .tm R;.nr \\$1 \\n%
 ..
 .de X
-.tm R;.nr \\$2\\$1 \\n%
-.tm I;\\$2
+.tm R;.nr \\$1 \\n%
+.tm I;\\$1
+\f[HI]\\$2\fP
+..
+.de XV
+.tm R;.nr \\$1 \\n%
+.tm I;\\$1
+\f[HI]\\$2\fP
+..
+.de XC
+.tm R;.nr \\$1 \\n%
+.tm I;\\$1
+\f[CB]\\$2\fP
 ..
 .de B
 \f[HB]\\$1\f[]\\$2
@@ -88,10 +99,14 @@
 ..
 .de CB
 .sp 0.4v
+\D'l 7.000i 0.000i'
 .ft CB
 .nf
 ..
 .de CE
+.sp -0.4
+\D'l 7.000i 0.000i'
+.sp 0.4
 .ft
 .fi
 ..
