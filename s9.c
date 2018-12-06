@@ -6,8 +6,8 @@
  * https://creativecommons.org/share-your-work/public-domain/cc0/
  */
 
-#define RELEASE_DATE	"2018-11-13"
-#define PATCHLEVEL	1
+#define RELEASE_DATE	"2018-12-05"
+#define PATCHLEVEL	0
 
 #include "s9core.h"
 #include "s9import.h"
@@ -1926,6 +1926,10 @@ void x_print_form(cell n, int depth) {
 		error("printer: too many nested lists or vectors", UNDEFINED);
 		return;
 	}
+	if (Intr) {
+		Intr = 0;
+		error("interrupted", UNDEFINED);
+	}
 	if (NIL == n) {
 		prints("()");
 	}
@@ -3333,11 +3337,19 @@ void stkalloc(int k) {
 	int	i;
 
 	if (Sp + k >= Sz) {
-		n = make_vector(Sz + CHUNK_SIZE);
+		/* allocate multiples of CHUNK_SIZE */
+		if (k >= CHUNK_SIZE) {
+			k = Sp+k-Sz;
+			k = CHUNK_SIZE * (1 + (k / CHUNK_SIZE));
+		}
+		else {
+			k = CHUNK_SIZE;
+		}
+		n = make_vector(Sz + k);
 		vs = vector(Rts);
 		vn = vector(n);
 		for (i=0; i<Sz; i++) vn[i] = vs[i];
-		Sz += CHUNK_SIZE;
+		Sz += k;
 		Rts = n;
 	}
 }
@@ -5332,8 +5344,6 @@ cell interpret(cell x) {
 	int	i;
 
 	Ip = 0;
-	/*Sp = -1;
-	Fp = -1;*/
 	E0 = make_vector(length(Glob));
 	i = 0;
 	v = vector(E0);
@@ -5504,7 +5514,7 @@ void longusage(void) {
 	prints("Scheme 9 from Empty Space by Nils M Holm, ");
 	prints(RELEASE_DATE);
 	if (PATCHLEVEL) {
-		prints(" pl");
+		prints(" p");
 		writec(PATCHLEVEL+'0');
 	}
 	nl();

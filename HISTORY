@@ -1,4 +1,37 @@
 
+2018-12-05
+
+	Fix: APPLYing a function to more than CHUNK_SIZE (1024) arguments
+	would result in a core dump. (Not that doing this is a good idea,
+	but it should work none the less).  The fix is SLOW. Be warned!
+
+2018-11-24
+
+	Fix: DISPLAY, WRITE, and REPL output could not be interrupted
+	by pressing INTR. (s9.c)
+
+2018-11-19
+
+	Exported tag() macro of S9core. (s9import.h)
+
+	Removed unused "Error" variable and misc. cosmetic changes.
+	(s9core.h)
+
+2018-11-15
+
+	Removed 16-bit support. It was mostly a lie anyway. (s9core.h)
+
+	Applied various fixes to TROFF mode in EDOC. (prog/)
+
+2018-11-14
+
+	Fix: EDOC generated index commands that were not contained in
+	separate lines in TROFF mode. (prog/)
+
+	Fix: C2HTML created spurious \fP in TROFF mode. (contrib/)
+
+	Fix: ptrdiff_t should be vlong on 64-bit Plan 9. (s9core.h)
+
 2018-11-13
 
 	Fix: LOCATE-FILE did not decode leading ~ in path names properly.

@@ -1,5 +1,5 @@
 17973 1 ./TODO
-51708 117 ./s9.c
+5135 118 ./s9.c
 64266 2 ./help/help
 1087 1 ./help/not
 49789 5 ./help/eqvp
@@ -386,7 +386,7 @@
 34249 4 ./help/disassemble
 41932 2 ./help/queue
 59308 43 ./s9.scm
-63295 16 ./s9core.h
+41914 15 ./s9core.h
 12183 20 ./s9.1.txt
 40498 2 ./LICENSE
 41089 38 ./contrib/format.scm
@@ -403,7 +403,7 @@
 61572 29 ./contrib/s9sos.txt
 58332 25 ./contrib/scm2html.scm
 64650 3 ./contrib/scheme.css
-7905 17 ./contrib/c2html.scm
+3057 17 ./contrib/c2html.scm
 54339 1 ./contrib/ccode.css
 20033 3 ./contrib/bottles.scm
 35641 2 ./contrib/queens.scm
@@ -594,8 +594,8 @@
 52392 9 ./prog/s9hts.scm
 30191 3 ./prog/cols.scm
 10549 1 ./prog/edoc.css
-17813 3 ./prog/edocbook.tr
-39228 62 ./prog/edoc.scm.edoc
+38452 3 ./prog/edocbook.tr
+59803 65 ./prog/edoc.scm.edoc
 62402 17 ./prog/rdb.scm
 3265 6 ./util/rpp.c
 53688 1 ./util/rp_html
@@ -623,15 +623,15 @@
 31056 3 ./util/book
 61601 1 ./util/s9.rc
 15813 8 ./README
-62432 8 ./Makefile
+39260 8 ./Makefile
 48690 1 ./config.scm
 17118 1 ./configure
 48846 2 ./mkfile
 54413 18 ./s9.1
 22479 73 ./s9core.c
-16403 10 ./HISTORY
+62032 11 ./HISTORY
 31191 75 ./s9core.txt
-25826 9 ./s9import.h
+49938 9 ./s9import.h
 23969 9 ./MASCOT.png
 57622 2 ./README.s9core
 22615 1 ./s9ext.h
