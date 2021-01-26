@@ -3268,6 +3268,8 @@ cell expand(cell x, int all) {
 	if (	car(x) == S_define ||
 		car(x) == S_define_syntax)
 	{
+		if (cddr(x) == NIL)
+			error("invalid form", x);
 		save(x);
 		if (pair_p(cadr(x))) {
 			n = expanddef(x);
