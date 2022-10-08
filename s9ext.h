@@ -1,6 +1,6 @@
 /*
  * Scheme 9 from Empty Space, Refactored
- * By Nils M Holm, 2007-2018
+ * By Nils M Holm, 2007-2019
  * In the public domain
  *
  * Interface for extension procedures.

@@ -1,5 +1,13 @@
 
+2019-04-02
+
+	Imported latest S9core. No user-visible changes.
+
 2018-12-05
+
+	Merged S9core fix by Micah Stetsion: s9core GC should never close
+	the current input or output port. Does not affect Scheme 9, but
+	is might affect other languages (like Klong). Thanks, Micah!
 
 	Fix: APPLYing a function to more than CHUNK_SIZE (1024) arguments
 	would result in a core dump. (Not that doing this is a good idea,

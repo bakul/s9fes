@@ -247,7 +247,7 @@ webdump:
 	sh util/make-html -r $(RELEASE)
 
 advdump:	prog/advgen.scm prog/adventure.adv prog/adventure.intro
-	sed -e 's/@dir/quest/' -e 's/@file/index/g' <util/pagehead >pagehead
+	sed -e 's/@dir/s9game/' -e 's/@file/index/g' <util/pagehead >pagehead
 	prog/advgen.scm -rv \
 		-P terminal:session \
 		-p pagehead \
@@ -273,7 +273,7 @@ dist:	clean s9.1.txt
 	ls -l s9fes-$(RELEASE).tgz | awk '{print int($$5/1024+.5)}'
 
 cdist:
-	tar cf - s9core.[ch] s9import.h s9core.txt README.s9core \
+	tar cf - s9core.[ch] s9import.h s9ext.h s9core.txt README.s9core \
 		| gzip -9 > s9core-$(RELEASE).tgz 
 
 arc:	clean
