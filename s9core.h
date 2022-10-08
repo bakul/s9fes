@@ -1,13 +1,13 @@
 /*
- * S9core Toolkit, Mk IVc
- * By Nils M Holm, 2007-2018
+ * S9core Toolkit, Mk IVd
+ * By Nils M Holm, 2007-2019
  * In the public domain
  *
  * Under jurisdictions without a public domain, the CC0 applies:
  * https://creativecommons.org/publicdomain/zero/1.0/
  */
 
-#define S9_VERSION "20181111"
+#define S9_VERSION "20190402"
 
 /*
  * Ugly prelude to deal with some system-dependent stuff.
@@ -424,6 +424,7 @@ int	system(char *s);
 #endif
 
 void	s9_abort(void);
+int	s9_aborted(void);
 void	s9_add_image_vars(s9_cell **v);
 s9_cell	s9_apply_prim(s9_cell f);
 s9_cell	s9_argv_to_list(char **argv);

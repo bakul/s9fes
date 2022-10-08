@@ -1,6 +1,6 @@
 /*
- * S9core Toolkit, Mk IVc
- * By Nils M Holm, 2007-2018
+ * S9core Toolkit, Mk IVd
+ * By Nils M Holm, 2007-2019
  * In the public domain
  *
  * Under jurisdictions without a public domain, the CC0 applies:
@@ -63,7 +63,7 @@ int		Input_port,
 		Output_port,
 		Error_port;
 
-static volatile int	Abort_flag;
+volatile int	Abort_flag;
 
 static char	*Str_outport;
 static int	Str_outport_len;
@@ -393,6 +393,10 @@ void s9_reset(void) {
 	Abort_flag = 0;
 }
 
+int s9_aborted(void) {
+	return Abort_flag;
+}
+
 /*
  * Memory Management
  */
@@ -532,6 +536,8 @@ int s9_gc(void) {
 		s9_count(&Collections);
 	for (i=0; i<S9_MAX_PORTS; i++) {
 		if (Port_flags[i] & S9_LOCK_TAG)
+			Port_flags[i] |= S9_USED_TAG;
+		else if (i == Input_port || i == Output_port)
 			Port_flags[i] |= S9_USED_TAG;
 		else
 			Port_flags[i] &= ~S9_USED_TAG;

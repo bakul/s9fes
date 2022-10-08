@@ -2,10 +2,10 @@
 	================================================================
 	|                           S9CORE                             |
 	|         A Toolkit for Implementing Dynamic Languages         |
-	|                           Mk IVc                             |
+	|                           Mk IVd                             |
 	================================================================
 
-	                     Nils M Holm, 2007-2018
+	                     Nils M Holm, 2007-2019
 	                      In the public domain
 
 	 If your country does not have a public domain, the CC0 applies:
@@ -250,6 +250,7 @@
 	recover from a failed image load (see load_image()).
 
 	----- void s9_abort(void); -------------------------------------
+	----- int s9_aborted(void); ------------------------------------
 	----- void s9_reset(void); -------------------------------------
 
 	The s9_abort() function will set an internal flag in the S9core
@@ -257,6 +258,11 @@
 	early and attempts to return to the caller as soon as possible.
 	It should be set when handling an error at the level of the
 	language being implemented on top of S9core.
+
+	The s9aborted() function return a non-zero value, if s9_abort()
+	has been called during the current computation. Alternatively,
+	the variable Abort_flag (int) can be declared extern for this
+	purpose.
 
 	s9_reset() resets the abort condition. It should be called when
 	recovering from an error condition and before using any other
