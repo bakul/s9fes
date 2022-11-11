@@ -35,14 +35,14 @@
 ;                    (symbol? '())           ==>  #f
 ;                    (symbol? #f)            ==>  #f
 
-(load-from-library "make-help-index.scm")
-(load-from-library "find-help-page.scm")
-(load-from-library "read-line.scm")
-(load-from-library "string-find.scm")
-(load-from-library "mergesort.scm")
-(load-from-library "flatten.scm")
-(load-from-library "list-to-set.scm")
-(load-from-library "filter.scm")
+(load-from-library "./lib/make-help-index.scm")
+(load-from-library "./lib/find-help-page.scm")
+(load-from-library "./lib/read-line.scm")
+(load-from-library "./lib/string-find.scm")
+(load-from-library "./lib/mergesort.scm")
+(load-from-library "./lib/flatten.scm")
+(load-from-library "./lib/list-to-set.scm")
+(load-from-library "./lib/filter.scm")
 
 (define *lines-per-page* (if (eq? *host-system* 'plan9) #f 23))
 

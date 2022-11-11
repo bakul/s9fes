@@ -13,7 +13,7 @@
 ;
 ; (Example): (find-help-page "help")  ==>  "path to help-page"
 
-(load-from-library "name-to-file-name.scm")
+(load-from-library "./lib/name-to-file-name.scm")
 
 (define (find-help-page s)
 

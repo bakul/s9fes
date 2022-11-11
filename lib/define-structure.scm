@@ -57,9 +57,9 @@
 ;              (list (point? p)
 ;                    (point-color p)))       ==>  (#t yellow)
 
-(load-from-library "iota.scm")
-(load-from-library "subvector.scm")
-(load-from-library "duplicates.scm")
+(load-from-library "./lib/iota.scm")
+(load-from-library "./lib/subvector.scm")
+(load-from-library "./lib/duplicates.scm")
 
 (define-syntax (define-structure name . slots)
   (if (not (symbol? name))

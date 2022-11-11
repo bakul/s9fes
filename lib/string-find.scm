@@ -28,7 +28,7 @@
 ;            (string-find-word "me" "test me")   ==>  "me"
 ;            (string-find-word "me" "testme")    ==>  #f
 
-(load-from-library "string-position.scm")
+(load-from-library "./lib/string-position.scm")
 
 (define (make-find pos)
   (lambda (u s)

@@ -24,7 +24,7 @@
 ;            (dupv '(#\a #\b #\a #\c))    ==>  (#\a)
 ;            (dupq '(a b c d a c e f c))  ==>  (a c)
 
-(load-from-library "memp.scm")
+(load-from-library "./lib/memp.scm")
 
 (define (dupp p x)
   (letrec

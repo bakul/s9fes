@@ -598,6 +598,7 @@ cell pp_sys_readlink(void) {
 	char	buf[MAXPATHLEN+1];
 	int	k;
 
+  int readlink(char*, char*, int);
 	k = readlink(string(parg(1)), buf, MAXPATHLEN);
 	if (k < 0) return sys_error("sys:readlink");
 	buf[k] = 0;
@@ -823,6 +824,7 @@ cell pp_sys_strerror(void) {
 }
 
 cell pp_sys_symlink(void) {
+  int symlink(char*, char*);
 	if (symlink(string(parg(1)), string(parg(2))) < 0)
 		return sys_error("sys:symlink");
 	return sys_ok();
@@ -880,6 +882,8 @@ cell pp_sys_unlock(void) {
 cell pp_sys_usleep(void) {
 #if __FreeBSD__ == 7
 	int usleep(useconds_t microseconds);
+#else
+  int usleep(int);
 #endif
 	if (usleep(integer_value("sys:usleep", parg(1))))
 		return sys_error("sys:usleep");

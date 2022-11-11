@@ -12,9 +12,9 @@
 ;
 ; (Example): (make-help-index)  ==>  (list of procedures and keywords)
 
-(load-from-library "flatten.scm")
-(load-from-library "list-to-set.scm")
-(load-from-library "mergesort.scm")
+(load-from-library "./lib/flatten.scm")
+(load-from-library "./lib/list-to-set.scm")
+(load-from-library "./lib/mergesort.scm")
 
 (define (make-help-index)
 

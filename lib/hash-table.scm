@@ -57,10 +57,10 @@
 ;              (hash-table-set! h "key" 'value)
 ;              (hash-table-ref  h "key"))        ==>  (value)
 
-(load-from-library "count.scm")
-(load-from-library "assp.scm")
-(load-from-library "keyword-value.scm")
-(load-from-library "define-structure.scm")
+(load-from-library "./lib/count.scm")
+(load-from-library "./lib/assp.scm")
+(load-from-library "./lib/keyword-value.scm")
+(load-from-library "./lib/define-structure.scm")
 
 (define-structure ht (len 0) (test equal?) table)
 

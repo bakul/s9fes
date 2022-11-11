@@ -10,8 +10,8 @@
 ;
 ; Example:   (mergesort <= '(5 3 7 9 1))  ==>  (1 3 5 7 9)
 
-(load-from-library "split.scm")
-(load-from-library "merge.scm")
+(load-from-library "./lib/split.scm")
+(load-from-library "./lib/merge.scm")
 
 (define (mergesort p a)
   (letrec

@@ -10,7 +10,7 @@
 ;
 ; Example:   (list->set '(a b c b c))  ==>  (a b c)
 
-(load-from-library "hash-table.scm")
+(load-from-library "./lib/hash-table.scm")
 
 (define (list->set a)
   (define (l->s a r)
