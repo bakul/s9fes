@@ -6,7 +6,7 @@ cell is represented by [o|o] with lines leading to their car
 and cdr parts. Conses with a cdr value of () are represented
 by [o|/].
 
-DT is an abbrevation for DRAW-TREE.
+DT is an abbreviation for DRAW-TREE.
 
 (draw-tree '((a) (b . c) (d e)))  ==>  unspecific
 

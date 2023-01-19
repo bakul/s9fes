@@ -62,7 +62,7 @@ mode CURS:GETCH does not block and delivers #F when there are
 no characters in the keyboard queue.
 
 CURS:RAW switches the terminal to "raw" mode. Raw mode is like
-cbreak mode, but in addition passes trough the interrupt, quit,
+cbreak mode, but in addition passes through the interrupt, quit,
 suspend, XON, and XOFF characters without interpreting them.
 Cbreak and raw mode exclude each other.
 

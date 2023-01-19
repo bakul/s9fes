@@ -34,7 +34,7 @@ the cursor. The following special keycode constants exist:
         CURS:KEY-NPAGE       next-page
 
 Before reading the keyboard queue, CURS:GETCH commits all pending
-writes to the scrren by calling CURS:REFRESH and also synchronizes
+writes to the screen by calling CURS:REFRESH and also synchronizes
 the hardware cursor with the virtual cursor. CURS:GETCH blocks unless
 nodelay mode (see CURS:NODELAY) has been activated. In nodelay mode
 CURS:GETCH returns #F when there are no characters in the keyboard

@@ -19,6 +19,6 @@ options will be evaluated:
            In this case, the result of FIND-HELP is
            unspecific.
 
-Unknown option characters will be ingored.
+Unknown option characters will be ignored.
 
 (scan-help-pages "help")  ==>  ("help" "locate-file")

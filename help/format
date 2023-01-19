@@ -95,7 +95,7 @@ COMMANDS
       (format #f "~,,' 4:B" #b10101100)  ==>  "1010 1100"
 
 ~C    char                                                 Character
-      Print next argument as a single characher.
+      Print next argument as a single character.
       When char is specified, print the character
       with the goven ASCII code.
 ~@C   Print that character in the same way as WRITE.

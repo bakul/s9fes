@@ -6,7 +6,7 @@ with #\-. SYMBOL will be used to label the X axis (on which the
 data points will be distributed).
 
 INTEGER1 (height) and INTEGER2 ; (width) specify the physical
-dimenions of the char canvas. Its virtual dimensions will be
+dimensions of the char canvas. Its virtual dimensions will be
 computed in such a way that all data points can be displayed.
 
 When the BOOLEAN (compression) argument is set to #T, then the

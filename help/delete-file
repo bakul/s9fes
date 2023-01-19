@@ -1,4 +1,4 @@
 S9fES  (delete-file string)  ==>  unspecific
 
-Delete the file specifed in the STRING argument. If the file does
+Delete the file specified in the STRING argument. If the file does
 not exist or cannot be deleted, report an error.

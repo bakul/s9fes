@@ -58,7 +58,7 @@ or #\+ character.
 When PARSE-OPTIONS detects a formal error (unknown option
 character, missing argument, etc), it will invoke the given
 PROCEDURE, which should print a short synopsis (a.k.a "usage").
-When #F is privided in the place of the usage procedure, a
+When #F is provided in the place of the usage procedure, a
 default message will be passed to ERROR. After running a
 user-supplied usage procedure the program will terminate with
 (sys:exit 1).

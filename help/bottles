@@ -2,7 +2,7 @@ S9 LIB  (bottles)            ==>  list
         (bottles tens ones)  ==>  list
 
 Generate the lyrics of the "99 bottles of beer" song using only
-DEFINE-SYNTAX/SYNTAX-RULES (and a little bit of arithmetics).
+DEFINE-SYNTAX/SYNTAX-RULES (and a little bit of arithmetic).
 
 (bottles)  ==>  ((99 bottles of beer on the wall)
                  (99 bottles of beer)

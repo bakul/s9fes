@@ -7,7 +7,7 @@ DISASSEMBLE disassembles the bytecode of the compilation
 unit containing the definition of the given PROCEDURE.
 The compilation block typically contains not only the
 code for the procedure itself, but also instructions for
-jumping over the body of the procecure, setting up its
+jumping over the body of the procedure, setting up its
 closure, and binding it to a location in the environment.
 When multiple procedures are defined in the same BEGIN
 block, all procedures contained in the block will be
@@ -76,7 +76,7 @@ Copy the N'th procedure argument to slot M of the new
 environment.
 
 OP:COPY-REF  |  n m  -->
-Copy envirnment slot N of the parent environment to
+Copy environment slot N of the parent environment to
 slot M of the new environment.
 
 OP:CLOSURE n  |  -->  procedure

@@ -9,7 +9,7 @@ child process:
 
         (input-port output-port integer)
 
-Note that the full path of the command must be spcified and no
+Note that the full path of the command must be specified and no
 shell operators like <, >, &, etc may be used. When PATH search
 or shell operators are needed, use SPAWN-SHELL-COMMAND instead.
 

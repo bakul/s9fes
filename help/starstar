@@ -16,7 +16,7 @@ do not change the value of this variable.
 
 *ARGUMENTS* is bound to a list of strings containing any command
 line arguments passed to the program being interpreted. This list
-does *not* include any options passed to the S9 interpeter.
+does *not* include any options passed to the S9 interpreter.
 
 *EPSILON* bound to the smallest difference between two real
 numbers in the given S9 implementation.

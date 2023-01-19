@@ -1,6 +1,6 @@
 S9 EXT  (sys:command-line)  ==>  list
 
-Return the command line arguments passed to the S9 interpeter
+Return the command line arguments passed to the S9 interpreter
 after the "--" argument. Each argument will be packaged in a
 separate string.
 
